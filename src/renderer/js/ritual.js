@@ -117,12 +117,12 @@ export class Ritual {
         <details>
           <summary>How this works</summary>
           <p>MannDaan uses the Presage SmartSpectra SDK to read breathing and pulse
-          from your camera, live. Optional SDK telemetry is turned off, so this app
-          sends no diagnostics to Presage. Video frames are
-          <!-- TODO: confirm via Presage Discord, then keep exactly one of: -->
-          processed for measurement and not stored.
-          MannDaan is a ritual, not a health tool. It measures nothing about you
-          worth keeping. Full details are in the README.</p>
+          from your camera, live. All measurements are computed on this device
+          ("on-device processing", per Presage's documentation); the SDK contacts
+          Presage's servers only to validate the API key and report usage statistics.
+          Optional SDK telemetry is turned off, so this app sends no diagnostics to
+          Presage. MannDaan is a ritual, not a health tool. It measures nothing about
+          you worth keeping. Full details are in the README.</p>
         </details>
       </div>
     `);

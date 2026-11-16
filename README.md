@@ -35,7 +35,7 @@ How SmartSpectra is used: [main.js](main.js) binds the SDK IPC (`bindSmartSpectr
 - No video or frames are recorded or stored by this app; signals are used live and discarded.
 - No accounts, no analytics, no AI/LLM services.
 - SmartSpectra SDK telemetry is **disabled** (`enableTelemetry: false`). See Presage's [Telemetry and Privacy](https://github.com/Presage-Security/SmartSpectra/blob/main/docs/telemetry-and-privacy.md) page for what it would otherwise send.
-- TODO: document the SDK's measurement processing path (on-device vs. cloud) once confirmed with Presage.
+- Measurement processing is **on-device**. Presage's documentation states: *"On-device processing for iOS, Android, C++ and Node.js"* ([smartspectra.presagetech.com](https://smartspectra.presagetech.com/)), and the [SDK README](https://github.com/Presage-Security/SmartSpectra) refers to *"the vitals the SDK computes on-device"*. The SDK's network traffic is for API-key authentication/subscription and usage reporting; with telemetry disabled, Presage's docs state *"the SDK starts no telemetry session and transmits nothing"* beyond that.
 
 MannDaan is a ritual, not a health tool. It measures nothing about you worth keeping — that's the point.
 

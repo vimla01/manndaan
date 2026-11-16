@@ -25,9 +25,18 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    fullscreen: process.argv.includes('--fullscreen'),
     backgroundColor: '#05060f',
     show: false,
     webPreferences,
+  });
+
+  // F11 toggles fullscreen (for demo recording)
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      win.setFullScreen(!win.isFullScreen());
+      event.preventDefault();
+    }
   });
 
   if (!MOCK) {

@@ -104,6 +104,8 @@
       line-height: 1.75;
       color: var(--ink);
       background: rgba(10, 12, 24, 0.7);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
       border: 1px solid rgba(138, 143, 166, 0.25);
       border-radius: 6px;
       padding: 28px 34px;
@@ -113,10 +115,10 @@
       color: var(--warm); letter-spacing: 0.06em;
     }
     .consent-box ul { margin: 10px 0; padding-left: 1.2em; }
-    .consent-box li { margin: 9px 0; color: #cfcabd; }
+    .consent-box li { margin: 10px 0; line-height: 1.4; color: #cfcabd; }
     .consent-box li b { color: var(--ink); font-weight: 600; }
-    .consent-box .subtitle { font-style: italic; color: var(--dim); margin: 0 0 14px; }
-    .consent-box .closing { font-style: italic; color: var(--dimmer); margin-top: 16px; }
+    .consent-box .subtitle { font-style: italic; color: #c3bdae; margin: 0 0 14px; }
+    .consent-box .closing { font-style: italic; color: #aea89a; margin-top: 16px; }
     .consent-box details { margin-top: 20px; }
     .consent-box summary {
       cursor: pointer; list-style: none;
@@ -218,8 +220,8 @@
     #breathdots span {
       position: relative;
       width: 13px; height: 5px;
-      background: transparent;
-      border: 1px solid rgba(232, 179, 106, 0.28);
+      background: rgba(232, 179, 106, 0.08);
+      border: 1px solid rgba(232, 179, 106, 0.55);
       border-top: none;
       border-radius: 0 0 7px 7px;
       transition: background 0.9s, border-color 0.9s;
