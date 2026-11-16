@@ -130,8 +130,8 @@ function frame(now) {
   // judges' readout — live numbers from the signal source
   const b = sig.breathing, c = sig.cardio;
   readout.innerHTML = b && c
-    ? `breath <span class="${b.stable ? 'stable' : 'unstable'}">${b.rate.toFixed(1)} br/min ${b.stable ? '●' : '○'}</span><br>` +
-      `pulse <span class="${c.stable ? 'stable' : 'unstable'}">${c.pulse.toFixed(0)} bpm ${c.stable ? '●' : '○'}</span>`
+    ? `breath <span class="${b.stable ? 'stable' : 'unstable'}">${b.rate.toFixed(1)}/min ${b.stable ? '●' : '○'}</span>` +
+      ` · pulse <span class="${c.stable ? 'stable' : 'unstable'}">${c.pulse.toFixed(0)} bpm ${c.stable ? '●' : '○'}</span>`
     : 'waiting for signal…';
 
   requestAnimationFrame(frame);
@@ -173,8 +173,11 @@ async function boot() {
   });
 
   if (mock) {
-    mockhelp.hidden = false;
-    mockhelp.textContent = 'mock: ↑/↓ breath speed · e erratic · h hint · r release · p pushback';
+    document.getElementById('mocktag').hidden = false;
+    if (new URLSearchParams(location.search).get('dev') === '1') {
+      mockhelp.hidden = false;
+      mockhelp.textContent = 'mock: ↑/↓ breath speed · e erratic · h hint · r release · p pushback';
+    }
   }
 
   requestAnimationFrame(frame);

@@ -20,11 +20,17 @@ export class Scene {
       tw: 0.5 + Math.random() * 2.5,
       ph: Math.random() * Math.PI * 2,
     }));
-    this.ghatLights = Array.from({ length: 9 }, (_, i) => ({
-      x: 0.04 + (i / 9) * 0.92 + (Math.random() - 0.5) * 0.05,
-      warm: Math.random(),
-      ph: Math.random() * Math.PI * 2,
-    }));
+    // far shore: unevenly spaced lamps, each with its own brightness and size
+    this.ghatLights = [];
+    for (let x = 0.03; x < 0.97; x += 0.05 + Math.random() * 0.13) {
+      this.ghatLights.push({
+        x: x + (Math.random() - 0.5) * 0.03,
+        warm: Math.random(),
+        b: 0.35 + Math.random() * 0.65,
+        r: 1.0 + Math.random() * 1.2,
+        ph: Math.random() * Math.PI * 2,
+      });
+    }
     this.shimmerSpecks = Array.from({ length: 70 }, () => ({
       x: Math.random(), d: Math.random(),          // d: depth 0 (horizon) .. 1 (near)
       sp: 0.004 + Math.random() * 0.012,
@@ -91,24 +97,22 @@ export class Scene {
     // ---- distant ghat lights + reflections ----
     for (const g of this.ghatLights) {
       const gx = g.x * w, gy = waterY - 3;
-      const flick = 0.75 + 0.25 * Math.sin(t * 2.1 + g.ph);
+      const flick = (0.72 + 0.28 * Math.sin(t * (1.7 + g.b) + g.ph)) * g.b;
       const col = g.warm > 0.4 ? '255,190,110' : '255,225,170';
-      ctx.fillStyle = `rgba(${col},${0.75 * flick})`;
+      ctx.fillStyle = `rgba(${col},${0.85 * flick})`;
       ctx.beginPath();
-      ctx.arc(gx, gy, 1.6, 0, Math.PI * 2);
+      ctx.arc(gx, gy, g.r, 0, Math.PI * 2);
       ctx.fill();
-      // wavering reflection streak
-      const len = 30 + 26 * flick;
-      const grad = ctx.createLinearGradient(0, gy + 3, 0, gy + 3 + len);
-      grad.addColorStop(0, `rgba(${col},${0.22 * flick})`);
-      grad.addColorStop(1, `rgba(${col},0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      for (let yy = 0; yy <= len; yy += 4) {
-        const off = Math.sin(t * 1.8 + yy * 0.22 + g.ph) * (1 + yy * 0.08);
-        ctx.rect(gx + off - 0.8, gy + 3 + yy, 1.6, 3);
+      // soft vertical glow streak, broken up by the water's movement:
+      // overlapping translucent slices read as one continuous wavering band
+      const len = (22 + 30 * flick) * g.b;
+      for (let yy = 0; yy <= len; yy += 3) {
+        const off = Math.sin(t * 1.6 + yy * 0.1 + g.ph) * (0.8 + yy * 0.05);
+        const fade = 1 - yy / len;
+        const ripple = 0.55 + 0.45 * Math.sin(t * 1.1 + yy * 0.12 + g.ph * 2);
+        ctx.fillStyle = `rgba(${col},${0.08 * flick * fade * ripple})`;
+        ctx.fillRect(gx + off - g.r, gy + 3 + yy, 2 * g.r, 7);
       }
-      ctx.fill();
     }
 
     // ---- shimmer specks (pulse-driven intensity) ----
@@ -135,28 +139,56 @@ export class Scene {
       ctx.stroke();
     }
 
-    // ---- ghat steps (foreground, bottom-left silhouette) ----
-    ctx.fillStyle = '#060504';
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    const steps = 5;
-    const stepW = w * 0.34 / steps, baseY = h * 0.995, topY = h * 0.80;
-    for (let i = 0; i <= steps; i++) {
-      const sx = w * 0.34 - i * stepW;
-      const sy = baseY - ((baseY - topY) / steps) * (steps - i);
-      ctx.lineTo(sx + stepW, sy);
-      ctx.lineTo(sx, sy);
+    // ---- ghat steps (foreground, bottom-left): stone slabs down to the water ----
+    const stepN = 5, stepTopY = h * 0.76, stepH = (h - stepTopY) / stepN;
+    const diyaGlow = s.diya.alpha * s.flameEnergy;
+    for (let i = 0; i < stepN; i++) {
+      const y = stepTopY + i * stepH;
+      const wdt = w * (0.17 + i * 0.045);   // lower steps reach further into the river
+      const g = ctx.createLinearGradient(0, y, 0, y + stepH);
+      g.addColorStop(0, i % 2 ? '#211a13' : '#1d1712');
+      g.addColorStop(1, '#0d0a07');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, wdt, stepH + 1);
+      // worn tread edge, warmer near the diya's light (lower steps)
+      const edgeA = 0.055 + (i / stepN) * 0.10 * diyaGlow;
+      ctx.fillStyle = `rgba(205,175,135,${edgeA})`;
+      ctx.fillRect(0, y, wdt, 1);
+      // soft shadow at the step's right end
+      const sg = ctx.createLinearGradient(wdt - 14, 0, wdt, 0);
+      sg.addColorStop(0, 'rgba(0,0,0,0)');
+      sg.addColorStop(1, 'rgba(0,0,0,0.45)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(wdt - 14, y, 14, stepH);
+      // soft waterline lapping where the lower steps meet the river
+      if (i >= stepN - 2) {
+        const lap = 0.05 + 0.05 * (0.5 + 0.5 * Math.sin(t * 1.4 + i * 1.7));
+        const wl = ctx.createLinearGradient(wdt * 0.5, 0, wdt, 0);
+        wl.addColorStop(0, 'rgba(160,185,235,0)');
+        wl.addColorStop(1, `rgba(160,185,235,${lap})`);
+        ctx.fillStyle = wl;
+        const wob = Math.sin(t * 1.1 + i) * 2;
+        ctx.fillRect(wdt * 0.5 + wob, y + stepH - 2, wdt * 0.5, 2);
+      }
     }
-    ctx.lineTo(0, topY);
-    ctx.closePath();
-    ctx.fill();
-    // faint warm edge on the lowest step, lit by the diya
-    if (s.diya.alpha > 0.1) {
-      ctx.strokeStyle = `rgba(232,160,80,${0.10 * s.diya.alpha * s.flameEnergy})`;
+    // two small lamps resting on the steps
+    for (const [lx, li] of [[0.125, 1], [0.255, 3]]) {
+      const ly = stepTopY + li * stepH - 1;
+      const px = lx * w;
+      const f = 0.72 + 0.28 * Math.sin(t * 6.3 + li * 2.1);
+      const lg = ctx.createRadialGradient(px, ly - 4, 1, px, ly - 4, 22);
+      lg.addColorStop(0, `rgba(255,185,95,${0.30 * f})`);
+      lg.addColorStop(1, 'rgba(255,185,95,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(px - 22, ly - 26, 44, 44);
+      ctx.fillStyle = '#3a2213';
       ctx.beginPath();
-      ctx.moveTo(w * 0.05, h * 0.955);
-      ctx.lineTo(w * 0.34, h * 0.955);
-      ctx.stroke();
+      ctx.ellipse(px, ly, 4.5, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,215,140,${0.9 * f})`;
+      ctx.beginPath();
+      ctx.ellipse(px, ly - 4.5, 1.5, 3.2 * f, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // ---- diya ----
@@ -213,6 +245,23 @@ export class Scene {
     ctx.fill();
     ctx.restore();
 
+    // reflection of the flame: a soft vertically-stretched glow streak that
+    // the ripples break into slow bright/dark patches
+    const reflLen = flameH * 2.4 + 30 * sc;
+    const reflTop = dy + 15 * sc;
+    const backing = ctx.createLinearGradient(0, reflTop, 0, reflTop + reflLen);
+    backing.addColorStop(0, `rgba(255,150,60,${0.10 * energy})`);
+    backing.addColorStop(1, 'rgba(255,150,60,0)');
+    ctx.fillStyle = backing;
+    ctx.fillRect(dx - 5 * sc, reflTop, 10 * sc, reflLen);
+    for (let yy = 0; yy < reflLen; yy += 3) {
+      const off = Math.sin(t * 1.9 + yy * 0.09) * (1 + yy * 0.045);
+      const fade = 1 - yy / reflLen;
+      const ripple = 0.5 + 0.5 * Math.sin(t * 1.3 + yy * 0.1);
+      ctx.fillStyle = `rgba(255,160,70,${0.16 * energy * fade * ripple})`;
+      ctx.fillRect(dx + off - 2 * sc, reflTop + yy, 4 * sc, 8);
+    }
+
     // air glow
     const glow = ctx.createRadialGradient(fx, fy - flameH * 0.5, 2, fx, fy - flameH * 0.5, 95 * sc);
     glow.addColorStop(0, `rgba(255,190,90,${0.30 + 0.2 * energy})`);
@@ -265,7 +314,7 @@ export class Scene {
     // worry text, written above the diya
     if (s.worry.text && s.worry.alpha > 0.01) {
       ctx.globalAlpha = s.diya.alpha * s.worry.alpha;
-      ctx.font = `italic ${Math.max(11, 15 * sc)}px Georgia`;
+      ctx.font = `italic 500 ${Math.max(11, 16 * sc)}px 'Cormorant Garamond', Georgia`;
       ctx.textAlign = 'center';
       const lines = wrapText(s.worry.text, 28);
       ctx.shadowColor = 'rgba(255,200,120,0.6)';

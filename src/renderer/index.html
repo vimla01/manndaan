@@ -8,6 +8,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MannDaan</title>
   <style>
+    /* Bundled fonts — SIL OFL 1.1, license texts in fonts/OFL-*.txt */
+    @font-face {
+      font-family: 'Cormorant Garamond';
+      font-style: normal; font-weight: 500;
+      src: url(fonts/cormorant-garamond.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Cormorant Garamond';
+      font-style: italic; font-weight: 500;
+      src: url(fonts/cormorant-garamond-italic.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal; font-weight: 400;
+      src: url(fonts/inter-400.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal; font-weight: 500;
+      src: url(fonts/inter-500.woff2) format('woff2');
+    }
+    @font-face {
+      font-family: 'Tiro Devanagari Hindi';
+      font-style: normal; font-weight: 400;
+      src: url(fonts/tiro-devanagari-hindi.woff2) format('woff2');
+    }
     :root {
       --ink: #e8e4d8;
       --dim: #8a8fa6;
@@ -18,7 +44,8 @@
       margin: 0; padding: 0; height: 100%;
       background: #04050d;
       color: var(--ink);
-      font-family: Georgia, 'Noto Serif', 'Noto Serif Devanagari', serif;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-weight: 500;
       overflow: hidden;
       cursor: default;
     }
@@ -56,6 +83,7 @@
     }
     .title .hindi {
       display: block;
+      font-family: 'Tiro Devanagari Hindi', serif;
       font-size: 0.42em;
       letter-spacing: 0.3em;
       color: var(--warm);
@@ -72,7 +100,7 @@
     .consent-box {
       max-width: 36em;
       text-align: left;
-      font-size: 15px;
+      font-size: 16.5px;
       line-height: 1.75;
       color: var(--ink);
       background: rgba(10, 12, 24, 0.7);
@@ -85,12 +113,29 @@
       color: var(--warm); letter-spacing: 0.06em;
     }
     .consent-box ul { margin: 10px 0; padding-left: 1.2em; }
-    .consent-box li { margin: 7px 0; color: #cfcabd; }
-    .consent-box .fine { font-size: 12.5px; color: var(--dimmer); margin-top: 14px; }
+    .consent-box li { margin: 9px 0; color: #cfcabd; }
+    .consent-box li b { color: var(--ink); font-weight: 600; }
+    .consent-box .subtitle { font-style: italic; color: var(--dim); margin: 0 0 14px; }
+    .consent-box .closing { font-style: italic; color: var(--dimmer); margin-top: 16px; }
+    .consent-box details { margin-top: 20px; }
+    .consent-box summary {
+      cursor: pointer; list-style: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; color: var(--dimmer);
+      user-select: none;
+    }
+    .consent-box summary::-webkit-details-marker { display: none; }
+    .consent-box summary::before { content: '\25B8\00a0'; }
+    .consent-box details[open] summary::before { content: '\25BE\00a0'; }
+    .consent-box details p {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px; color: var(--dimmer);
+      line-height: 1.65; margin: 8px 0 0;
+    }
 
     .btnrow { margin-top: 26px; display: flex; gap: 18px; justify-content: center; }
     button {
-      font-family: inherit; font-size: 15px;
+      font-family: 'Inter', sans-serif; font-size: 13.5px;
       color: var(--ink);
       background: transparent;
       border: 1px solid rgba(232, 179, 106, 0.55);
@@ -102,8 +147,21 @@
     }
     button:hover { background: rgba(232, 179, 106, 0.16); }
     button.quiet { border-color: rgba(138, 143, 166, 0.35); color: var(--dim); }
+    button.soft {
+      border-color: rgba(232, 179, 106, 0.28);
+      color: rgba(232, 228, 216, 0.75);
+      background: rgba(10, 12, 24, 0.4);
+    }
+    button.soft:hover { border-color: rgba(232, 179, 106, 0.6); color: var(--ink); }
 
+    #mocktag {
+      position: fixed; top: 14px; right: 18px;
+      font-family: 'Inter', sans-serif; font-size: 11px;
+      color: var(--dimmer); opacity: 0.55; user-select: none;
+    }
     #worry-input {
+      display: block;
+      margin: 0 auto;
       font-family: inherit; font-style: italic;
       font-size: clamp(17px, 2vw, 22px);
       color: var(--ink);
@@ -119,10 +177,14 @@
     #worry-input::placeholder { color: var(--dimmer); font-style: italic; }
 
     .hintline {
-      position: fixed; top: 12vh; left: 0; right: 0;
+      position: fixed; top: 12vh; left: 50%;
+      transform: translateX(-50%);
+      width: min(86vw, 34em);
       text-align: center;
       font-style: italic;
-      font-size: clamp(15px, 1.8vw, 19px);
+      font-size: clamp(14px, 2vw, 20px);
+      line-height: 1.5;
+      overflow-wrap: break-word;
       color: rgba(232, 228, 216, 0.8);
       opacity: 0;
       transition: opacity 1.2s ease;
@@ -132,8 +194,9 @@
 
     #readout {
       position: fixed; right: 18px; bottom: 14px;
-      font-family: ui-monospace, 'Cascadia Code', monospace;
-      font-size: 12px; line-height: 1.7; color: var(--dimmer);
+      font-family: 'Inter', sans-serif;
+      font-size: 11.5px; line-height: 1.7; color: var(--dimmer);
+      font-variant-numeric: tabular-nums;
       text-align: right; user-select: none;
       opacity: 0;
       transition: opacity 1.5s;
@@ -142,23 +205,43 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
+    /* seven tiny diyas: one lights per calm breath */
     #breathdots {
-      position: fixed; bottom: 26px; left: 50%;
+      position: fixed; bottom: 48px; left: 50%;
       transform: translateX(-50%);
-      display: flex; gap: 14px;
+      display: flex; gap: 18px;
       opacity: 0;
       transition: opacity 1.5s;
       pointer-events: none;
     }
     #breathdots.show { opacity: 1; }
     #breathdots span {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: rgba(138, 143, 166, 0.25);
-      transition: background 0.8s, box-shadow 0.8s;
+      position: relative;
+      width: 13px; height: 5px;
+      background: transparent;
+      border: 1px solid rgba(232, 179, 106, 0.28);
+      border-top: none;
+      border-radius: 0 0 7px 7px;
+      transition: background 0.9s, border-color 0.9s;
     }
     #breathdots span.lit {
-      background: #e8b36a;
-      box-shadow: 0 0 8px rgba(232, 179, 106, 0.8);
+      background: linear-gradient(#6b3d22, #2a1709);
+      border-color: rgba(232, 179, 106, 0.55);
+    }
+    #breathdots span::after {
+      content: '';
+      position: absolute;
+      left: 50%; bottom: 4px;
+      width: 5px; height: 8px;
+      transform: translateX(-50%);
+      border-radius: 50% 50% 42% 42% / 68% 68% 32% 32%;
+      background: linear-gradient(#ffeec0, #ff9c3f);
+      opacity: 0;
+      transition: opacity 0.9s, box-shadow 0.9s;
+    }
+    #breathdots span.lit::after {
+      opacity: 1;
+      box-shadow: 0 0 10px 2px rgba(255, 180, 90, 0.55);
     }
     #preview {
       position: fixed; left: 18px; bottom: 40px;
@@ -169,7 +252,7 @@
     }
     #mockhelp {
       position: fixed; left: 18px; bottom: 14px;
-      font-family: ui-monospace, monospace; font-size: 11px;
+      font-family: 'Inter', sans-serif; font-size: 11px;
       color: var(--dimmer); opacity: 0.55; user-select: none;
     }
   </style>
@@ -179,6 +262,7 @@
   <div class="hintline" id="hintline"></div>
   <div id="overlay"></div>
   <div id="breathdots"></div>
+  <div id="mocktag" hidden>mock mode — camera off</div>
   <div id="readout"></div>
   <video id="preview" muted playsinline hidden></video>
   <div id="mockhelp" hidden></div>

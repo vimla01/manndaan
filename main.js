@@ -38,7 +38,11 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'), {
-    query: { mode: MOCK ? 'mock' : 'live', smoke: SMOKE ? '1' : '0' },
+    query: {
+      mode: MOCK ? 'mock' : 'live',
+      smoke: SMOKE ? '1' : '0',
+      dev: process.argv.includes('--dev') ? '1' : '0',
+    },
   });
   return win;
 }

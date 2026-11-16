@@ -39,6 +39,14 @@ How SmartSpectra is used: [main.js](main.js) binds the SDK IPC (`bindSmartSpectr
 
 MannDaan is a ritual, not a health tool. It measures nothing about you worth keeping — that's the point.
 
+## Credits
+
+- **Fonts** (bundled in `src/renderer/fonts/`, all under the [SIL Open Font License 1.1](https://openfontlicense.org/) — license texts alongside the font files):
+  - [Cormorant Garamond](https://fonts.google.com/specimen/Cormorant+Garamond) © the Cormorant Project Authors
+  - [Inter](https://fonts.google.com/specimen/Inter) © the Inter Project Authors
+  - [Tiro Devanagari Hindi](https://fonts.google.com/specimen/Tiro+Devanagari+Hindi) © the Indigo Project Authors (Tiro Typeworks)
+- **SmartSpectra SDK** © Presage Technologies, used under its own license as an npm dependency.
+
 ## License
 
 MIT (this app's code only; the SmartSpectra SDK is a dependency under its own license).

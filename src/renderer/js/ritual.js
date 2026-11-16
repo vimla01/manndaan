@@ -86,59 +86,56 @@ export class Ritual {
   _enterTitle() {
     this.state = 'title';
     this._show(`
-      <div class="line" id="t1">
-        <div class="title">MannDaan<span class="hindi">मन दान</span></div>
-        <div class="tagline">Offer what weighs on your mann. Seven breaths. One diya.</div>
-      </div>
-      <div class="btnrow line" id="t2"><button id="begin">Begin</button></div>
+      <div class="line title" id="t1">MannDaan</div>
+      <div class="line title" id="t2"><span class="hindi">मन दान</span></div>
+      <div class="line tagline" id="t3">Offer what weighs on your mann. Seven breaths. One diya.</div>
+      <div class="btnrow line" id="t4"><button id="begin">Begin</button></div>
     `);
     setTimeout(() => document.getElementById('t1')?.classList.add('show'), 400);
-    setTimeout(() => document.getElementById('t2')?.classList.add('show'), 2200);
+    setTimeout(() => document.getElementById('t2')?.classList.add('show'), 1600);
+    setTimeout(() => document.getElementById('t3')?.classList.add('show'), 2800);
+    setTimeout(() => document.getElementById('t4')?.classList.add('show'), 3800);
     document.getElementById('begin').onclick = () => this._enterConsent();
   }
 
   _enterConsent() {
     this.state = 'consent';
-    const cameraNote = this.mock
-      ? `<li><b>Mock mode:</b> no camera is used. A simulated breath drives everything.</li>`
-      : `<li>Your camera feed is used only to measure your <b>breathing and pulse</b>, live, through the Presage SmartSpectra SDK. MannDaan never records, saves, or uploads video or photos.</li>`;
     this._show(`
       <div class="consent-box line show">
         <h2>Before the river listens</h2>
+        <p class="subtitle">To carry your diya, the river needs to hear you breathe.</p>
         <ul>
-          ${cameraNote}
-          <li>What you type stays <b>in memory only</b> — never written to disk, logs, or any server — and is wiped when the river takes it.</li>
-          <li>No accounts, no analytics, no AI services.</li>
-          <li>The SDK's optional telemetry is <b>disabled</b>: this app sends no diagnostics to Presage.</li>
+          <li><b>Your camera watches only your breath and heartbeat.</b> Nothing is recorded, nothing is kept.</li>
+          <li><b>Your words stay with you.</b> They live only in this moment, and they're gone when the river takes them.</li>
+          <li><b>No one else is here.</b> No accounts, no tracking, no AI reading your words.</li>
         </ul>
-        <p class="fine">MannDaan is a ritual, not a health tool. It measures nothing about
-        you worth keeping — that is the point. Where the SDK itself processes frames
-        (on this device or Presage's servers) is being confirmed; see the README.</p>
+        <p class="closing">Nothing you offer here will be saved. That's the point.</p>
         <div class="btnrow">
-          <button id="consent-yes">I consent — light the diya</button>
-          <button id="consent-no" class="quiet">Not now</button>
+          <button id="consent-yes">Light the diya</button>
+          <button id="consent-no" class="quiet">Not tonight</button>
         </div>
+        <details>
+          <summary>How this works</summary>
+          <p>MannDaan uses the Presage SmartSpectra SDK to read breathing and pulse
+          from your camera, live. Optional SDK telemetry is turned off, so this app
+          sends no diagnostics to Presage. Video frames are
+          <!-- TODO: confirm via Presage Discord, then keep exactly one of: -->
+          processed for measurement and not stored.
+          MannDaan is a ritual, not a health tool. It measures nothing about you
+          worth keeping. Full details are in the README.</p>
+        </details>
       </div>
     `);
     document.getElementById('consent-yes').onclick = async () => {
       try {
-        await this.onConsent();
+        await this.onConsent();   // the camera turns on here, not before
         this._enterWrite();
       } catch (err) {
         this.showHint('The river could not reach you. (camera error — see console)');
         console.error('signal start failed:', err);
       }
     };
-    document.getElementById('consent-no').onclick = () => this._enterDeclined();
-  }
-
-  _enterDeclined() {
-    this.state = 'declined';
-    this._show(`
-      <p class="line show">The river will wait.</p>
-      <div class="btnrow"><button id="reconsider" class="quiet">Return</button></div>
-    `);
-    document.getElementById('reconsider').onclick = () => this._enterTitle();
+    document.getElementById('consent-no').onclick = () => this._enterOpening();
   }
 
   _enterWrite() {
@@ -209,10 +206,10 @@ export class Ritual {
       this.worryAlpha = Math.max(0, this.worryAlpha - 0.012);
       if (this.worryAlpha <= 0) clearInterval(fade);
     }, 40);
-    // the diya floats away downstream, toward the far lights
-    this._animate({ x: 0.84, y: 0.645, scale: 0.16 }, 16000, easeInOutLong, () => {
+    // the diya floats away downstream and stays: a tiny flame on the horizon
+    this._animate({ x: 0.84, y: 0.635, scale: 0.09 }, 16000, easeInOutLong, () => {
       this._wipeWorry();
-      this._animate({ alpha: 0 }, 3000, easeInOut, () => this._enterClosing());
+      this._enterClosing();
     });
   }
 
@@ -229,8 +226,8 @@ export class Ritual {
       <p class="line" id="c1">Nothing was saved. That was the point.</p>
       <p class="line" id="c2" style="margin-top:1.4em; color: var(--dim)">The river was always within you.</p>
       <div class="btnrow line" id="c3">
-        <button id="again">Offer another</button>
-        <button id="close" class="quiet">Close</button>
+        <button id="again" class="soft">Offer another</button>
+        <button id="close" class="soft">Close</button>
       </div>
     `, false);
     setTimeout(() => document.getElementById('c1')?.classList.add('show'), 800);
