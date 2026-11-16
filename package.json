@@ -4,19 +4,25 @@
   "description": "MannDaan (मन दान) — an offering from the heart. A digital deepdaan driven by your live breath.",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --mock",
-    "smoke": "electron . --mock --smoke"
+    "build": "esbuild src/renderer/js/app.js --bundle --format=esm --outfile=src/renderer/build/app.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --mock",
+    "smoke": "npm run build && electron . --mock --smoke"
   },
   "author": "vimla01",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^38.4.0"
+    "electron": "^38.4.0",
+    "esbuild": "^0.28.2"
   },
   "dependencies": {
+    "@smartspectra/node-sdk": "^3.5.0",
     "dotenv": "^16.4.5"
   },
   "allowScripts": {
-    "electron@38.8.6": true
+    "electron@38.8.6": true,
+    "koffi@2.16.4": true,
+    "protobufjs@7.6.6": true,
+    "esbuild@0.28.2": true
   }
 }

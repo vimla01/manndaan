@@ -15,12 +15,16 @@ npm run dev
 
 Mock controls: ↑/↓ breath speed, `e` erratic breathing, `h` fake validation hint.
 
-## Run (live mode) — coming in step 3
+## Run (live mode)
 
 ```bash
 cp .env.example .env   # add your key from https://physiology.presagetech.com
 npm start
 ```
+
+The camera stays off until you click "I consent" on the consent screen.
+
+How SmartSpectra is used: [main.js](main.js) binds the SDK IPC (`bindSmartSpectraIpc`) and the SDK preload; [src/renderer/js/signals/live.js](src/renderer/js/signals/live.js) constructs the renderer SDK with `enableTelemetry: false`, decodes `metrics.breathing.rate` / `upperTrace` and `metrics.cardio.pulseRate`, and maps `validationStatus` codes to on-screen hints. The breathing trace drives the flame; the averaged rate + `stable` flag gate the release.
 
 ## Consent and Data Handling
 

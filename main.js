@@ -14,11 +14,13 @@ function createWindow() {
   const webPreferences = {
     contextIsolation: true,
     sandbox: true,
-    preload: path.join(__dirname, 'preload.js'),
   };
 
-  // Live mode (step 3) will instead use the SDK preload:
-  //   webPreferences.preload = require.resolve('@smartspectra/node-sdk/preload');
+  // Live mode: the SDK's preload exposes its IPC bridge. Our own tiny preload
+  // (config bridge) is registered session-wide in app.whenReady(), so both run.
+  if (!MOCK) {
+    webPreferences.preload = require.resolve('@smartspectra/node-sdk/preload');
+  }
 
   const win = new BrowserWindow({
     width: 1280,
@@ -29,8 +31,8 @@ function createWindow() {
   });
 
   if (!MOCK) {
-    // Step 3: const { bindSmartSpectraIpc } = require('@smartspectra/node-sdk');
-    // bindSmartSpectraIpc(win);
+    const { bindSmartSpectraIpc } = require('@smartspectra/node-sdk/main');
+    bindSmartSpectraIpc(win);
   }
 
   win.once('ready-to-show', () => win.show());
@@ -48,12 +50,22 @@ app.whenReady().then(() => {
     callback(allowed);
   });
 
+  // Our config preload runs alongside the SDK preload (which occupies the
+  // single webPreferences.preload slot in live mode).
+  session.defaultSession.registerPreloadScript({
+    type: 'frame',
+    filePath: path.join(__dirname, 'preload.js'),
+  });
+
   ipcMain.handle('manndaan:getConfig', () => ({
     mode: MOCK ? 'mock' : 'live',
-    // The API key never reaches the renderer in mock mode; in live mode it is
-    // read from .env here and handed to the SDK binding, not to page JS.
-    hasApiKey: Boolean(process.env.PRESAGE_API_KEY),
+    // Live mode: the renderer constructs the SDK, so it needs the key (.env only).
+    apiKey: MOCK ? null : process.env.PRESAGE_API_KEY ?? null,
   }));
+
+  if (!MOCK && !process.env.PRESAGE_API_KEY) {
+    console.error('No PRESAGE_API_KEY in .env — live mode will not start. (cp .env.example .env)');
+  }
 
   const win = createWindow();
 

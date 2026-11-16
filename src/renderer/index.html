@@ -142,6 +142,13 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
+    #preview {
+      position: fixed; left: 18px; bottom: 40px;
+      width: 150px; border-radius: 4px;
+      border: 1px solid rgba(138, 143, 166, 0.35);
+      opacity: 0.8;
+      transform: scaleX(-1); /* mirror, like looking at yourself */
+    }
     #mockhelp {
       position: fixed; left: 18px; bottom: 14px;
       font-family: ui-monospace, monospace; font-size: 11px;
@@ -154,7 +161,8 @@
   <div class="hintline" id="hintline"></div>
   <div id="overlay"></div>
   <div id="readout"></div>
+  <video id="preview" muted playsinline hidden></video>
   <div id="mockhelp" hidden></div>
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="build/app.js"></script>
 </body>
 </html>

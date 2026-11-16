@@ -2,6 +2,7 @@
 // SmartSpectra in step 3), the Scene renderer, and the Ritual state machine.
 
 import { MockSignal } from './signals/mock.js';
+import { LiveSignal } from './signals/live.js';
 import { Scene } from './scene.js';
 import { Ritual } from './ritual.js';
 
@@ -42,8 +43,18 @@ function onSample(e) {
 
 // --- main loop --------------------------------------------------------------
 let scene, ritual;
+let fpsCount = 0, fpsStart = 0;
 
 function frame(now) {
+  // FPS instrumentation for NOTES.md
+  if (!fpsStart) fpsStart = now;
+  fpsCount++;
+  if (now - fpsStart >= 10000) {
+    console.log(`[measure] render fps: ${(fpsCount / ((now - fpsStart) / 1000)).toFixed(1)} over last 10 s`);
+    fpsCount = 0;
+    fpsStart = now;
+  }
+
   // ease flame energy toward target: stable+calm breath = tall, still flame
   const calm = sig.breathing?.stable ?? false;
   const target = calm ? 0.9 : 0.25;
@@ -90,13 +101,19 @@ async function boot() {
     if (mock) {
       signal = new MockSignal();
     } else {
-      // Step 3: const { LiveSignal } = await import('./signals/live.js');
-      // signal = new LiveSignal(cfg);
-      throw new Error('live mode not wired yet (step 3)');
+      if (!cfg.apiKey) throw new Error('no PRESAGE_API_KEY in .env');
+      signal = new LiveSignal({ apiKey: cfg.apiKey });
+      signal.addEventListener('stream', (e) => {
+        // small live preview: honest proof the signal is real
+        const v = document.getElementById('preview');
+        v.srcObject = e.detail.stream;
+        v.hidden = false;
+        v.play().catch(() => {});
+      });
     }
     signal.addEventListener('sample', onSample);
     signal.addEventListener('hint', (e) => ritual.showHint(e.detail.message));
-    signal.start();
+    await signal.start();   // mock: sync; live: resolves when the camera runs
   };
 
   ritual = new Ritual({
