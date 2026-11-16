@@ -1,0 +1,22 @@
+{
+  "name": "manndaan",
+  "version": "0.1.0",
+  "description": "MannDaan (मन दान) — an offering from the heart. A digital deepdaan driven by your live breath.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --mock",
+    "smoke": "electron . --mock --smoke"
+  },
+  "author": "vimla01",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^38.4.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}

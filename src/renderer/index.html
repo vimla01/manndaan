@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <!-- worker-src blob: is required by the SmartSpectra renderer SDK (step 3) -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MannDaan</title>
+  <style>
+    :root {
+      --ink: #e8e4d8;
+      --dim: #7a7f96;
+    }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #05060f;
+      color: var(--ink);
+      font-family: Georgia, 'Noto Serif', serif;
+      overflow: hidden;
+      cursor: default;
+    }
+    #scene { display: block; width: 100vw; height: 100vh; }
+    #readout {
+      position: fixed; right: 18px; bottom: 14px;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: 12px; line-height: 1.7; color: var(--dim);
+      text-align: right; user-select: none;
+      opacity: 0.85;
+    }
+    #readout .stable { color: #9fc49a; }
+    #readout .unstable { color: #b08a6a; }
+    #mockhelp {
+      position: fixed; left: 18px; bottom: 14px;
+      font-family: ui-monospace, monospace; font-size: 11px;
+      color: var(--dim); opacity: 0.6; user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="readout"></div>
+  <div id="mockhelp" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
