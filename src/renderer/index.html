@@ -207,44 +207,6 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
-    /* seven tiny diyas: one lights per calm breath */
-    #breathdots {
-      position: fixed; bottom: 48px; left: 50%;
-      transform: translateX(-50%);
-      display: flex; gap: 18px;
-      opacity: 0;
-      transition: opacity 1.5s;
-      pointer-events: none;
-    }
-    #breathdots.show { opacity: 1; }
-    #breathdots span {
-      position: relative;
-      width: 13px; height: 5px;
-      background: rgba(232, 179, 106, 0.08);
-      border: 1px solid rgba(232, 179, 106, 0.55);
-      border-top: none;
-      border-radius: 0 0 7px 7px;
-      transition: background 0.9s, border-color 0.9s;
-    }
-    #breathdots span.lit {
-      background: linear-gradient(#6b3d22, #2a1709);
-      border-color: rgba(232, 179, 106, 0.55);
-    }
-    #breathdots span::after {
-      content: '';
-      position: absolute;
-      left: 50%; bottom: 4px;
-      width: 5px; height: 8px;
-      transform: translateX(-50%);
-      border-radius: 50% 50% 42% 42% / 68% 68% 32% 32%;
-      background: linear-gradient(#ffeec0, #ff9c3f);
-      opacity: 0;
-      transition: opacity 0.9s, box-shadow 0.9s;
-    }
-    #breathdots span.lit::after {
-      opacity: 1;
-      box-shadow: 0 0 10px 2px rgba(255, 180, 90, 0.55);
-    }
     #preview {
       position: fixed; left: 18px; bottom: 40px;
       width: 150px; border-radius: 4px;
@@ -263,7 +225,6 @@
   <canvas id="scene"></canvas>
   <div class="hintline" id="hintline"></div>
   <div id="overlay"></div>
-  <div id="breathdots"></div>
   <div id="mocktag" hidden>mock mode — camera off</div>
   <div id="readout"></div>
   <video id="preview" muted playsinline hidden></video>

@@ -6,8 +6,9 @@
   "scripts": {
     "build": "esbuild src/renderer/js/app.js --bundle --format=esm --outfile=src/renderer/build/app.js",
     "start": "npm run build && electron .",
-    "dev": "npm run build && electron . --mock --dev",
-    "smoke": "npm run build && electron . --mock --smoke"
+    "dev": "npm run build && electron . --mock",
+    "smoke": "npm run build && electron . --mock --smoke",
+    "dev:debug": "npm run build && electron . --mock --dev"
   },
   "author": "vimla01",
   "license": "MIT",

@@ -21,7 +21,6 @@ const readout = document.getElementById('readout');
 const hintline = document.getElementById('hintline');
 const overlay = document.getElementById('overlay');
 const mockhelp = document.getElementById('mockhelp');
-const breathdots = document.getElementById('breathdots');
 
 const ctx = canvas.getContext('2d');
 function resize() {
@@ -58,7 +57,7 @@ const gate = new BreathGate(TUNING);
 let rushHinted = false;
 
 function updateDots(count) {
-  [...breathdots.children].forEach((dot, i) => dot.classList.toggle('lit', i < count));
+  scene.setBreathCount(count, performance.now());
 }
 
 gate.addEventListener('breath', (e) => {
@@ -83,6 +82,7 @@ gate.addEventListener('rush', () => {
 let scene, ritual;
 let fpsCount = 0, fpsStart = 0;
 let prevState = '';
+let prevTraceSmooth = 0, lastExhaleRipple = 0;
 
 function frame(now) {
   // FPS instrumentation for NOTES.md
@@ -100,6 +100,17 @@ function frame(now) {
   sig.flameEnergy += (target - sig.flameEnergy) * 0.02;
   sig.traceSmooth += (sig.trace - sig.traceSmooth) * 0.12;
 
+  // each exhale (smoothed trace falling through zero) sends one ripple
+  // out from the diya: calm = wide and slow, rushed = small and choppy
+  if (ritual?.state === 'breathe'
+      && prevTraceSmooth > 0 && sig.traceSmooth <= 0
+      && now - lastExhaleRipple > 1500) {
+    lastExhaleRipple = now;
+    scene.breathRipple(ritual.diya.x * innerWidth,
+                       ritual.diya.y * innerHeight + 10, calm);
+  }
+  prevTraceSmooth = sig.traceSmooth;
+
   // shimmer follows pulse: resting pulse ≈ calm water, higher = livelier
   const pulse = sig.cardio?.pulse ?? 70;
   const shimmerTarget = Math.min(1, Math.max(0, (pulse - 55) / 50));
@@ -112,7 +123,6 @@ function frame(now) {
       updateDots(0);
       rushHinted = false;
     }
-    breathdots.classList.toggle('show', ritual.state === 'breathe');
     prevState = ritual.state;
   }
 
@@ -125,6 +135,7 @@ function frame(now) {
     shimmer: sig.shimmer,
     diya: r.diya,
     worry: r.worry,
+    breath: { visible: ritual.state === 'breathe' },
   });
 
   // judges' readout — live numbers from the signal source
@@ -144,7 +155,6 @@ async function boot() {
   console.log(`MannDaan booted in ${cfg.mode} mode`);
 
   scene = new Scene(canvas);
-  for (let i = 0; i < TUNING.needed; i++) breathdots.appendChild(document.createElement('span'));
 
   let signal = null;
   const startSignal = async () => {
@@ -200,7 +210,7 @@ async function boot() {
     at(11000, () => { signal.periodS = 1.2; });            // rushing
     at(20000, () => { signal.periodS = 9; });              // settle during pushback
     at(27000, () => { gate.calmMinS = 2; signal.periodS = 3.2; });  // calm (shortened for smoke)
-    at(56000, () => console.log(`smoke: final state=${ritual.state} worry="${ritual.worry}" dots=${breathdots.querySelectorAll('.lit').length}`));
+    at(56000, () => console.log(`smoke: final state=${ritual.state} worry="${ritual.worry}" calm=${gate.calmCount}`));
   }
 }
 
