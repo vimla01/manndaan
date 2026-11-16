@@ -36,7 +36,7 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'), {
-    query: { mode: MOCK ? 'mock' : 'live' },
+    query: { mode: MOCK ? 'mock' : 'live', smoke: SMOKE ? '1' : '0' },
   });
   return win;
 }
@@ -66,7 +66,7 @@ app.whenReady().then(() => {
         console.log('[renderer]', e.message);
       }
     });
-    setTimeout(() => app.quit(), 6000);
+    setTimeout(() => app.quit(), 42000);
   }
 });
 
