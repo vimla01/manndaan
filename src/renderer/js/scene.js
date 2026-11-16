@@ -203,6 +203,10 @@ export class Scene {
 
     this.ripples = [];   // warm rings: {x, y, t0, dur, rx0, rx1, k}
     this.ink = [];       // {x, y, vx, vy, r, alpha}
+    this._flick = 0;         // eased flame flicker, never per-frame random
+    this._flickTarget = 0;
+    this._flickAt = 0;
+    this._traceEase = 0;     // extra smoothing on the breath trace
     this._textBob = 0;   // heavily smoothed diya bob — the worry text follows
                          // only this, never the flame's flicker
     this._layers = {};   // offscreen caches for static layers, keyed by name
@@ -419,9 +423,9 @@ export class Scene {
   }
 
   _drawBreathDots(ctx, now, s, w, h) {
-    const k = this.vs / 1.5;
+    const k = this.vs / 1.5;                 // one uniform scale: never squashes
     const cx = s.diya.x * w, cy = s.diya.y * h + 150 * k;
-    const gap = 22 * k, rad = 5 * k;
+    const gap = 38 * k;
     for (let i = 0; i < this.dots.length; i++) {
       const d = this.dots[i];
       let lit = 0;
@@ -432,23 +436,50 @@ export class Scene {
           if (lit <= 0) { d.litAt = 0; d.unlitAt = 0; }
         }
       }
-      const x = cx + (i - 3) * gap;
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.beginPath();
-      ctx.arc(x, cy, rad, 0, Math.PI * 2);
-      ctx.fill();
-      if (lit > 0.01) {
-        ctx.save();
-        ctx.globalAlpha = lit;
-        const g = 14 * k;
-        ctx.drawImage(this.dotGlowSprite, x - g, cy - g, g * 2, g * 2);
-        ctx.fillStyle = '#ffb347';
-        ctx.beginPath();
-        ctx.arc(x, cy, rad, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
+      this._breathFlame(ctx, cx + (i - 3) * gap, cy, k, lit, i, now);
     }
+  }
+
+  /** One of the seven breath flames: 8 x 14 px teardrop, outline when unlit,
+   *  filled and glowing when a calm breath has been offered. */
+  _breathFlame(ctx, x, y, k, lit, i, now) {
+    // flicker and the fade-in scale-up are both uniform, so the shape keeps
+    // its proportions on any display
+    const SZ = 1.65;                        // 8 x 14 base, scaled up to read clearly
+    const flicker = 1 + 0.05 * Math.sin(now / 320 + i * 1.7);
+    const u = k * SZ * (lit > 0 ? (0.8 + 0.2 * lit) * flicker : 1);
+
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.bezierCurveTo(x - 4 * u, y - 1.5 * u, x - 4 * u, y - 6 * u, x - 1.2 * u, y - 10 * u);
+      ctx.bezierCurveTo(x - 0.4 * u, y - 11.6 * u, x, y - 13 * u, x, y - 14 * u);
+      ctx.bezierCurveTo(x, y - 13 * u, x + 0.4 * u, y - 11.6 * u, x + 1.2 * u, y - 10 * u);
+      ctx.bezierCurveTo(x + 4 * u, y - 6 * u, x + 4 * u, y - 1.5 * u, x, y);
+      ctx.closePath();
+    };
+
+    // the outline is always there, so a flame that goes out fades back to it
+    ctx.save();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    path();
+    ctx.stroke();
+
+    if (lit > 0.01) {
+      const g = 16 * k;
+      ctx.globalAlpha = lit * 0.9;
+      ctx.drawImage(this.dotGlowSprite, x - g, y - 11 * k - g, g * 2, g * 2);
+      ctx.globalAlpha = lit;
+      const grad = ctx.createRadialGradient(x, y - 5 * u, 0.5 * u, x, y - 5 * u, 7 * u);
+      grad.addColorStop(0, '#fff3c0');
+      grad.addColorStop(0.5, '#ffb347');
+      grad.addColorStop(1, '#ff7a1a');
+      ctx.fillStyle = grad;
+      path();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   draw(now, s) {
@@ -879,9 +910,20 @@ export class Scene {
 
     const calm = s.calm;
     const energy = s.flameEnergy;
-    const jitter = calm ? 0 : (Math.random() - 0.5) * 16 * (1 - energy);
-    const flameH = sc * (16 + 30 * energy + (s.trace ?? 0) * 9) + jitter * 0.4;
-    const sway = Math.sin(t * 3.1) * 1.6 * sc + (calm ? 0 : jitter * 0.5);
+    // Flicker must never be re-rolled per frame — at 60-100 fps that reads as
+    // a shiver. A random target is picked a few times a second and eased
+    // toward, mixed with two slow sines, for an organic flame.
+    if (now - this._flickAt > 170) {
+      this._flickAt = now;
+      this._flickTarget = (Math.random() - 0.5) * 2;
+    }
+    this._flick += (this._flickTarget - this._flick) * 0.07;
+    const unrest = calm ? 0 : (1 - energy);
+    const flick = (this._flick * 5 + Math.sin(t * 6.1) * 1.1 + Math.sin(t * 9.7) * 0.5) * unrest;
+    // the breath trace is eased again here so signal noise can't shiver it
+    this._traceEase += ((s.trace ?? 0) - this._traceEase) * 0.08;
+    const flameH = sc * (16 + 30 * energy + this._traceEase * 9 + flick * 0.5);
+    const sway = (Math.sin(t * 3.1) * 1.6 + Math.sin(t * 5.3) * 0.5 + flick * 0.35) * sc;
     const fx = dx, fy = dy - 5.5 * sc;
 
     // lamplight pooling on the water: an ellipse flattened about 2.2:1,
