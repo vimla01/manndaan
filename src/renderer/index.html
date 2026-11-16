@@ -142,6 +142,24 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
+    #breathdots {
+      position: fixed; bottom: 26px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 14px;
+      opacity: 0;
+      transition: opacity 1.5s;
+      pointer-events: none;
+    }
+    #breathdots.show { opacity: 1; }
+    #breathdots span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(138, 143, 166, 0.25);
+      transition: background 0.8s, box-shadow 0.8s;
+    }
+    #breathdots span.lit {
+      background: #e8b36a;
+      box-shadow: 0 0 8px rgba(232, 179, 106, 0.8);
+    }
     #preview {
       position: fixed; left: 18px; bottom: 40px;
       width: 150px; border-radius: 4px;
@@ -160,6 +178,7 @@
   <canvas id="scene"></canvas>
   <div class="hintline" id="hintline"></div>
   <div id="overlay"></div>
+  <div id="breathdots"></div>
   <div id="readout"></div>
   <video id="preview" muted playsinline hidden></video>
   <div id="mockhelp" hidden></div>

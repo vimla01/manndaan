@@ -5,12 +5,23 @@ import { MockSignal } from './signals/mock.js';
 import { LiveSignal } from './signals/live.js';
 import { Scene } from './scene.js';
 import { Ritual } from './ritual.js';
+import { BreathGate } from './breathgate.js';
+
+// Game-mechanic thresholds ("calm enough for the river") — tune after webcam
+// sessions, log changes in NOTES.md.
+const TUNING = {
+  calmMinS: 5,     // full breath cycle at least this slow = calm
+  rushMaxS: 2.5,   // faster than this = rushing
+  needed: 7,       // seven breaths, one diya
+  rushLimit: 3,    // rushed breaths in a row before the river refuses
+};
 
 const canvas = document.getElementById('scene');
 const readout = document.getElementById('readout');
 const hintline = document.getElementById('hintline');
 const overlay = document.getElementById('overlay');
 const mockhelp = document.getElementById('mockhelp');
+const breathdots = document.getElementById('breathdots');
 
 const ctx = canvas.getContext('2d');
 function resize() {
@@ -39,11 +50,39 @@ function onSample(e) {
   sig.cardio = d.cardio;
   sig.samples++;
   if (sig.samples === 1) console.log('first sample received');
+  if (ritual?.state === 'breathe') gate.feed(d.trace, d.t);
 }
+
+// --- breath gate ------------------------------------------------------------
+const gate = new BreathGate(TUNING);
+let rushHinted = false;
+
+function updateDots(count) {
+  [...breathdots.children].forEach((dot, i) => dot.classList.toggle('lit', i < count));
+}
+
+gate.addEventListener('breath', (e) => {
+  const { durationS, kind } = e.detail;
+  console.log(`[gate] breath ${durationS.toFixed(1)} s — ${kind} (calm ${gate.calmCount}/${gate.needed})`);
+  if (kind === 'calm') {
+    scene.addRipple(ritual.diya.x * innerWidth, ritual.diya.y * innerHeight + 10);
+  } else if (kind === 'rushed' && !rushHinted) {
+    rushHinted = true;
+    ritual.showHint('Slower. The river is in no hurry.');
+  }
+});
+gate.addEventListener('progress', (e) => updateDots(e.detail.count));
+gate.addEventListener('release', () => ritual.release());
+gate.addEventListener('rush', () => {
+  ritual.pushback();
+  gate.reset();
+  updateDots(0);
+});
 
 // --- main loop --------------------------------------------------------------
 let scene, ritual;
 let fpsCount = 0, fpsStart = 0;
+let prevState = '';
 
 function frame(now) {
   // FPS instrumentation for NOTES.md
@@ -65,6 +104,17 @@ function frame(now) {
   const pulse = sig.cardio?.pulse ?? 70;
   const shimmerTarget = Math.min(1, Math.max(0, (pulse - 55) / 50));
   sig.shimmer += (shimmerTarget - sig.shimmer) * 0.01;
+
+  // breath-gate visibility + lifecycle follows the ritual state
+  if (ritual.state !== prevState) {
+    if (ritual.state === 'breathe' && prevState === 'settle') {
+      gate.reset();           // a fresh offering starts from zero breaths
+      updateDots(0);
+      rushHinted = false;
+    }
+    breathdots.classList.toggle('show', ritual.state === 'breathe');
+    prevState = ritual.state;
+  }
 
   ritual.update(now);
   const r = ritual.getDrawState();
@@ -94,6 +144,7 @@ async function boot() {
   console.log(`MannDaan booted in ${cfg.mode} mode`);
 
   scene = new Scene(canvas);
+  for (let i = 0; i < TUNING.needed; i++) breathdots.appendChild(document.createElement('span'));
 
   let signal = null;
   const startSignal = async () => {
@@ -141,9 +192,12 @@ async function boot() {
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
       }
     });
-    at(13000, () => ritual.pushback());
-    at(22500, () => ritual.release());
-    at(41000, () => console.log(`smoke: final state=${ritual.state} worry="${ritual.worry}"`));
+    // drive the real gate through the mock signal: rush → pushback,
+    // then (with a shortened calm threshold) slow breathing → release
+    at(11000, () => { signal.periodS = 1.2; });            // rushing
+    at(20000, () => { signal.periodS = 9; });              // settle during pushback
+    at(27000, () => { gate.calmMinS = 2; signal.periodS = 3.2; });  // calm (shortened for smoke)
+    at(56000, () => console.log(`smoke: final state=${ritual.state} worry="${ritual.worry}" dots=${breathdots.querySelectorAll('.lit').length}`));
   }
 }
 

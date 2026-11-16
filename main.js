@@ -78,7 +78,7 @@ app.whenReady().then(() => {
         console.log('[renderer]', e.message);
       }
     });
-    setTimeout(() => app.quit(), 42000);
+    setTimeout(() => app.quit(), 58000);
   }
 });
 
