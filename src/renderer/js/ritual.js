@@ -166,9 +166,14 @@ export class Ritual {
   _enterFraming() {
     this.state = 'framing';
     this._show(`
-      <p class="line show" style="margin-bottom:0.6em">Sit back, so the lamp can see you breathe.</p>
-      <p class="line show" style="color: var(--dim); font-size: 0.8em">
-        Your head <em>and</em> chest should be in the picture.</p>
+      <p class="line show" style="margin-bottom:0.5em">Let the lamp find you.</p>
+      <ol class="framing-steps line show">
+        <li>Sit back until your <b>head and chest</b> are both in the picture —
+            your breath is read from your chest, not your face.</li>
+        <li>Face a window or a lamp. The camera needs light to see you move.</li>
+        <li>Settle, and be still.</li>
+      </ol>
+      <p class="line show framing-wait" id="f1">waiting for the lamp to find you…</p>
       <div class="btnrow line" id="f2"><button id="skip-framing" class="quiet">Continue anyway</button></div>
     `);
     document.body.classList.add('framing');
@@ -178,7 +183,14 @@ export class Ritual {
     const t0 = performance.now();
     this._framingTimer = setInterval(() => {
       // move on once the SDK is happy, or after 25 s so nobody is ever stuck
-      if (this.isFramed() || performance.now() - t0 > 25000) this._leaveFraming();
+      const waiting = document.getElementById('f1');
+      if (this.isFramed()) {
+        clearInterval(this._framingTimer);
+        if (waiting) waiting.textContent = 'There you are.';
+        setTimeout(() => this._leaveFraming(), 900);
+      } else if (performance.now() - t0 > 25000) {
+        this._leaveFraming();
+      }
     }, 250);
   }
 

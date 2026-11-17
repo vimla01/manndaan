@@ -97,6 +97,24 @@
       margin-top: 1.6em;
     }
 
+    .framing-steps {
+      text-align: left;
+      max-width: 30em;
+      margin: 0 auto;
+      padding-left: 1.3em;
+      font-size: clamp(14px, 1.6vw, 17px);
+      line-height: 1.7;
+      color: #cfcabd;
+    }
+    .framing-steps li { margin: 8px 0; }
+    .framing-steps b { color: var(--ink); }
+    .framing-wait {
+      margin-top: 1.4em;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--dimmer);
+    }
     .consent-box {
       max-width: 36em;
       text-align: left;
@@ -207,13 +225,23 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
-    /* while framing, the preview becomes the subject of the screen */
+    /* While framing, the preview becomes the subject of the screen — and the
+       instructions sit above it. The video element comes after the overlay in
+       the DOM, so without this it paints straight over the text. */
+    body.framing #overlay {
+      justify-content: flex-start;
+      padding-top: 7vh;
+      z-index: 3;
+      pointer-events: none;
+    }
+    body.framing #overlay button { pointer-events: auto; }
     body.framing #preview {
-      width: min(46vw, 560px);
+      width: min(40vw, 480px);
       right: 50%;
       transform: translateX(50%) scaleX(-1);
-      bottom: 14vh;
+      bottom: 6vh;
       opacity: 1;
+      z-index: 1;
       border-color: rgba(232, 179, 106, 0.5);
       box-shadow: 0 0 60px rgba(255, 170, 90, 0.18);
     }

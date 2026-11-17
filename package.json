@@ -11,7 +11,8 @@
     "dev:debug": "npm run build && electron . --mock --dev",
     "start:nosandbox": "npm run build && electron . --no-sandbox",
     "dev:nosandbox": "npm run build && electron . --mock --no-sandbox",
-    "camera:reset": "electron tools/reset-camera.js"
+    "camera:reset": "electron tools/reset-camera.js",
+    "shots": "npm run build && electron tools/screenshots.js"
   },
   "author": "vimla01",
   "license": "MIT",

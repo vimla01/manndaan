@@ -6,6 +6,7 @@ import { LiveSignal } from './signals/live.js';
 import { Scene } from './scene.js';
 import { Ritual } from './ritual.js';
 import { BreathGate } from './breathgate.js';
+import { Ambience } from './audio.js';
 
 // Game-mechanic thresholds ("calm enough for the river") — tune after webcam
 // sessions, log changes in NOTES.md.
@@ -102,9 +103,10 @@ gate.addEventListener('rush', () => {
 
 // --- main loop --------------------------------------------------------------
 let scene, ritual, signal = null;   // module scope: the frame loop releases the camera
+const ambience = new Ambience();
 let fpsCount = 0, fpsStart = 0;
 let prevState = '';
-let prevTraceSmooth = 0, lastExhaleRipple = 0, lastBreathAt = 0;
+let prevTraceSmooth = 0, lastExhaleRipple = 0, lastBreathAt = 0, lastAmbience = 0;
 let fpsSamples = [];
 
 // The scene was rendering at 100+ fps, starving the SDK's camera pipeline.
@@ -169,6 +171,7 @@ function frame(now) {
       // the measurement is over: give the camera back immediately
       signal?.stop?.();
       window.manndaan?.releaseCamera?.();
+      setTimeout(() => ambience.stop(), 14000);   // after the diya has gone
       const v = document.getElementById('preview');
       if (v) { v.srcObject = null; v.hidden = true; }
     }
@@ -180,6 +183,10 @@ function frame(now) {
     prevState = ritual.state;
   }
 
+  if (now - lastAmbience > 500) {
+    lastAmbience = now;
+    ambience.update({ pulse: sig.cardio?.pulse, state: ritual.state });
+  }
   ritual.update(now);
   const r = ritual.getDrawState();
   scene.draw(now, {
@@ -215,6 +222,7 @@ async function boot() {
   scene = new Scene(canvas);
 
   const startSignal = async () => {
+    ambience.start();          // the consent click is the gesture audio needs
     if (signal) return;
     if (mock) {
       signal = new MockSignal();
@@ -278,6 +286,13 @@ async function boot() {
       mockhelp.textContent = 'mock: ↑/↓ breath speed · e erratic · h hint · r release · p pushback';
     }
   }
+
+  // 'm' silences the ghat
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'm' || e.key === 'M') {
+      ritual.showHint(ambience.toggleMute() ? 'Sound off.' : 'Sound on.');
+    }
+  });
 
   requestAnimationFrame(frame);
 

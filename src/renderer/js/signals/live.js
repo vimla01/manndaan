@@ -93,9 +93,16 @@ export class LiveSignal extends EventTarget {
     this.sdk.on('error', (code, message, retryable) => {
       console.error(`[sdk error] code=${code} retryable=${retryable}: ${message}`);
       this.stats.errors.push(`${code}: ${message}`);
-      this.dispatchEvent(new CustomEvent('hint', {
-        detail: { code: 'SDK_ERROR', message: 'The river lost sight of you. (see console)' },
-      }));
+      if (retryable) {
+        this.dispatchEvent(new CustomEvent('hint', {
+          detail: { code: 'SDK_RETRY', message: 'The river blinked. Finding you again…' },
+        }));
+        this._restart();
+      } else {
+        this.dispatchEvent(new CustomEvent('hint', {
+          detail: { code: 'SDK_ERROR', message: 'The river lost sight of you. (see console)' },
+        }));
+      }
     });
   }
 
@@ -133,6 +140,27 @@ export class LiveSignal extends EventTarget {
 
   /** Stop measuring and hand the camera back to the system straight away.
    *  Safe to call repeatedly and from a page-unload handler. */
+  /** The SDK stops itself when conditions slip — a sagging frame rate, usually.
+   *  Those errors are flagged retryable, so rebuild the pipeline and carry on
+   *  rather than ending someone's ritual with a console message. */
+  async _restart() {
+    if (this._restarting) return;
+    this._restarting = true;
+    this.stats.restarts = (this.stats.restarts ?? 0) + 1;
+    try {
+      await this.sdk.reset();          // required after an error state
+      await this.sdk.start();
+      console.log('[live] measurement restarted after a retryable error');
+    } catch (err) {
+      console.error('[live] restart failed:', err.message);
+      this.dispatchEvent(new CustomEvent('hint', {
+        detail: { code: 'SDK_ERROR', message: 'The river lost sight of you. (see console)' },
+      }));
+    } finally {
+      setTimeout(() => { this._restarting = false; }, 4000);
+    }
+  }
+
   async stop() {
     if (this._stopping) return;
     this._stopping = true;
@@ -260,6 +288,7 @@ export class LiveSignal extends EventTarget {
       pulseRange: s.pulseMin === Infinity ? null
         : [Math.round(s.pulseMin), Math.round(s.pulseMax)],
       camera: s.camera ?? null,
+      restarts: s.restarts ?? 0,
       traceSamples: s.traceSamples,
       traceRawRange: s.traceMin === Infinity ? null
         : [+s.traceMin.toFixed(4), +s.traceMax.toFixed(4)],
