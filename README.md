@@ -24,6 +24,21 @@ npm start
 
 The camera stays off until you click "I consent" on the consent screen.
 
+### Linux: Electron's sandbox helper
+
+`npm install` cannot make Electron's `chrome-sandbox` helper setuid-root, so on
+Linux the first run may abort with *"The SUID sandbox helper binary was found,
+but is not configured correctly"*. Fix it once (keeps Chromium's sandbox on):
+
+```bash
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+```
+
+Repeat after reinstalling Electron. If you cannot use `sudo` (or the project
+lives on a `nosuid` mount), run `npm run start:nosandbox` instead — same app,
+with Chromium's OS-level sandbox disabled.
+
 How SmartSpectra is used: [main.js](main.js) binds the SDK IPC (`bindSmartSpectraIpc`) and the SDK preload; [src/renderer/js/signals/live.js](src/renderer/js/signals/live.js) constructs the renderer SDK with `enableTelemetry: false`, decodes `metrics.breathing.rate` / `upperTrace` and `metrics.cardio.pulseRate`, and maps `validationStatus` codes to on-screen hints. The breathing trace drives the flame; the averaged rate + `stable` flag gate the release.
 
 ## Consent and Data Handling

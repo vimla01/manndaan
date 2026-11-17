@@ -10,13 +10,17 @@
 import {
   SmartSpectraSDK,
   breathingMetrics,
-  cardioMetrics,
+  MetricType,
   ValidationCode,
 } from '@smartspectra/node-sdk/renderer';
 import { decodeMetrics } from '@smartspectra/node-sdk/messages';
 
 // Poetic hints for the ritual; anything unmapped falls back to the SDK's own
 // hint text. null = stay silent (purely technical, not actionable mid-ritual).
+// code -> name, for the log ("why is it not measuring?")
+const CODE_NAME = Object.fromEntries(
+  Object.entries(ValidationCode).map(([name, value]) => [value, name]));
+
 const HINTS = {
   [ValidationCode.kNoFaceFound]: "The river can't see you. Face the water.",
   [ValidationCode.kMultipleFacesFound]: 'One offering at a time.',
@@ -33,7 +37,13 @@ export class LiveSignal extends EventTarget {
     super();
     this.sdk = new SmartSpectraSDK({
       apiKey,
-      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      // Only what the ritual uses. The `cardioMetrics` bundle also contains
+      // ARTERIAL_PRESSURE_TRACE and HRV, which need Presage's encrypted model
+      // delivered into ~/.cache/SmartSpectraSDK; when that cache is empty the
+      // graph goes terminal the moment a face appears and every frame is
+      // dropped. Requesting the minimum is both more robust and a smaller
+      // privacy surface.
+      requestedMetrics: [...breathingMetrics, MetricType.PULSE_RATE],
       enableTelemetry: false,   // consent screen promises this
     });
 
@@ -61,6 +71,7 @@ export class LiveSignal extends EventTarget {
       traceMin: Infinity, traceMax: -Infinity,
       rateMin: Infinity, rateMax: -Infinity,
       pulseMin: Infinity, pulseMax: -Infinity,
+      camera: null,            // what the webcam actually delivered
       validation: {},          // code -> count
       errors: [],
     };
@@ -83,12 +94,59 @@ export class LiveSignal extends EventTarget {
     this._t0 = performance.now();
     this.stats.startedAt = Date.now();
     this._cadenceWindowStart = this._t0;
-    await this.sdk.start();   // acquires the camera, emits streamAvailable
+
+    // The SDK's default capture is 1280x720@30. Indoor webcams lengthen their
+    // exposure in dim light and sag to 10-15 fps at that size, and the SDK
+    // then stops the session with error 14 ("frame rate stayed too low").
+    // Asking for 640x480 keeps the rate up and gives the pipeline a quarter of
+    // the pixels to process.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 }, height: { ideal: 480 },
+          frameRate: { ideal: 30, min: 15 },
+        },
+        audio: false,
+      });
+      this._stream = stream;
+      this.sdk.useMediaStream(stream);
+      const st = stream.getVideoTracks()[0].getSettings();
+      this.stats.camera = { width: st.width, height: st.height, frameRate: st.frameRate };
+      console.log(`[measure] camera ${st.width}x${st.height} @ ${st.frameRate} fps`);
+      this.dispatchEvent(new CustomEvent('stream', { detail: { stream } }));
+    } catch (err) {
+      console.warn('[live] could not open the camera ourselves, letting the SDK try:', err.message);
+    }
+
+    await this.sdk.start();   // uses our stream, or acquires one itself
     console.log(`[measure] sdk.start() resolved after ${(performance.now() - this._t0).toFixed(0)} ms`);
   }
 
+  /** Stop measuring and hand the camera back to the system straight away. */
   async stop() {
     try { await this.sdk.stop(); } catch (e) { console.warn('stop failed', e); }
+    if (this._stream) {
+      // Put the camera back the way we found it. The SDK locks AE/AWB/focus
+      // while measuring, and on Linux those are device-level V4L2 controls
+      // that survive this process — leaving them locked makes every other app
+      // (video calls included) see a dark, fixed-exposure picture.
+      for (const track of this._stream.getVideoTracks()) {
+        try {
+          const caps = track.getCapabilities ? track.getCapabilities() : {};
+          const advanced = [];
+          if (caps.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' });
+          if (caps.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' });
+          if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
+          if (advanced.length) await track.applyConstraints({ advanced });
+          console.log('[live] camera auto-exposure restored');
+        } catch (err) {
+          console.warn('[live] could not restore camera controls:', err.message);
+        }
+      }
+      for (const track of this._stream.getTracks()) track.stop();
+      this._stream = null;
+      console.log('[live] camera released');
+    }
   }
 
   destroy() { this.sdk.destroy(); }
@@ -189,6 +247,7 @@ export class LiveSignal extends EventTarget {
         : [+s.rateMin.toFixed(1), +s.rateMax.toFixed(1)],
       pulseRange: s.pulseMin === Infinity ? null
         : [Math.round(s.pulseMin), Math.round(s.pulseMax)],
+      camera: s.camera ?? null,
       traceSamples: s.traceSamples,
       traceRawRange: s.traceMin === Infinity ? null
         : [+s.traceMin.toFixed(4), +s.traceMax.toFixed(4)],
@@ -198,8 +257,15 @@ export class LiveSignal extends EventTarget {
   }
 
   _onValidation(code, sdkHint) {
-    if (code === ValidationCode.kOk) return;
     const now = performance.now();
+    // log every change of state, throttled per code, so the terminal shows
+    // exactly what the SDK is unhappy about
+    this._lastLogged = this._lastLogged ?? {};
+    if (!this._lastLogged[code] || now - this._lastLogged[code] > 3000) {
+      this._lastLogged[code] = now;
+      console.log(`[validation] ${CODE_NAME[code] ?? code}${sdkHint ? ' — ' + sdkHint : ''}`);
+    }
+    if (code === ValidationCode.kOk) return;
     if (now - this._lastHintAt < 6000) return;   // don't nag
     const message = code in HINTS ? HINTS[code] : sdkHint;
     if (!message) return;

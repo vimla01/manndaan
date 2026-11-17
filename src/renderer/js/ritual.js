@@ -126,14 +126,15 @@ export class Ritual {
         </details>
       </div>
     `);
-    document.getElementById('consent-yes').onclick = async () => {
-      try {
-        await this.onConsent();   // the camera turns on here, not before
-        this._enterWrite();
-      } catch (err) {
+    document.getElementById('consent-yes').onclick = () => {
+      // The camera takes a couple of seconds to wake. Move on at once rather
+      // than holding the consent card up while it does — otherwise the preview
+      // appears underneath a screen that is still asking for permission.
+      this._enterWrite();
+      Promise.resolve(this.onConsent()).catch((err) => {
         this.showHint('The river could not reach you. (camera error — see console)');
         console.error('signal start failed:', err);
-      }
+      });
     };
     document.getElementById('consent-no').onclick = () => this._enterOpening();
   }
@@ -176,7 +177,12 @@ export class Ritual {
   _enterBreathe() {
     this.state = 'breathe';
     this.readout.classList.add('show');
-    this.showHint('Breathe with the flame. Slowly.');
+    // Breathing is read from the chest, not the face: people sit too close to
+    // a laptop for the camera to see it, so say that before anything else.
+    this.showHint(this.mock
+      ? 'Breathe with the flame. Slowly.'
+      : 'Sit back so your head and chest are both in frame.');
+    if (!this.mock) setTimeout(() => this.showHint('Breathe with the flame. Slowly.'), 7000);
   }
 
   // ---------- journeys ----------

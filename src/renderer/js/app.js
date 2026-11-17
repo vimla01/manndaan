@@ -39,6 +39,10 @@ const sig = {
   cardio: null,        // { pulse, confidence, stable }
   flameEnergy: 0.5,    // eased: high when calm & stable
   shimmer: 0.5,        // eased: follows pulse (gentle)
+  status: 'warming up — the first reading takes a few seconds',
+  lamp: 0,             // screen used as a lamp when the camera cannot see
+  lampUntil: 0,
+  lite: false,         // shed expensive effects when the CPU is needed elsewhere
   samples: 0,
 };
 
@@ -85,13 +89,30 @@ let prevState = '';
 let prevTraceSmooth = 0, lastExhaleRipple = 0;
 let fpsSamples = [];
 
+// The scene was rendering at 100+ fps, starving the SDK's camera pipeline.
+// 45 is plenty for this artwork and leaves the measurement its CPU.
+const FRAME_MS = 1000 / 30;
+let lastDraw = 0;
+
 function frame(now) {
+  if (now - lastDraw < FRAME_MS) { requestAnimationFrame(frame); return; }
+  lastDraw = now;
+
   // FPS instrumentation for NOTES.md
   if (!fpsStart) fpsStart = now;
   fpsCount++;
   if (now - fpsStart >= 10000) {
     const fps = +(fpsCount / ((now - fpsStart) / 1000)).toFixed(1);
     fpsSamples.push(fps);
+    // The SmartSpectra pipeline needs CPU more than the artwork does: if we
+    // cannot hold the budget, shed the expensive water effects until we can.
+    if (fps < 26 && !sig.lite) {
+      sig.lite = true;
+      console.log('[measure] lite effects ON (fps ' + fps + ') — freeing CPU for the SDK');
+    } else if (fps > 45 && sig.lite) {
+      sig.lite = false;
+      console.log('[measure] lite effects OFF (fps ' + fps + ')');
+    }
     console.log(`[measure] render fps: ${fps} over last 10 s`);
     fpsCount = 0;
     fpsStart = now;
@@ -100,6 +121,7 @@ function frame(now) {
   // ease flame energy toward target: stable+calm breath = tall, still flame
   const calm = sig.breathing?.stable ?? false;
   const target = calm ? 0.9 : 0.25;
+  sig.lamp += ((now < sig.lampUntil ? 1 : 0) - sig.lamp) * 0.02;
   sig.flameEnergy += (target - sig.flameEnergy) * 0.02;
   sig.traceSmooth += (sig.trace - sig.traceSmooth) * 0.12;
 
@@ -121,7 +143,14 @@ function frame(now) {
 
   // breath-gate visibility + lifecycle follows the ritual state
   if (ritual.state !== prevState) {
-    if (ritual.state === 'release') window.mdReport?.();   // auto-print at the end
+    if (ritual.state === 'release') {
+      window.mdReport?.();                       // auto-print at the end
+      // the measurement is over: give the camera back immediately
+      signal?.stop?.();
+      window.manndaan?.releaseCamera?.();
+      const v = document.getElementById('preview');
+      if (v) { v.srcObject = null; v.hidden = true; }
+    }
     if (ritual.state === 'breathe' && prevState === 'settle') {
       gate.reset();           // a fresh offering starts from zero breaths
       updateDots(0);
@@ -139,6 +168,8 @@ function frame(now) {
     shimmer: sig.shimmer,
     diya: r.diya,
     worry: r.worry,
+    lite: sig.lite,
+    lamp: sig.lamp,
     breath: { visible: ritual.state === 'breathe' },
   });
 
@@ -147,7 +178,7 @@ function frame(now) {
   readout.innerHTML = b && c
     ? `breath <span class="${b.stable ? 'stable' : 'unstable'}">${b.rate.toFixed(1)}/min ${b.stable ? '●' : '○'}</span>` +
       ` · pulse <span class="${c.stable ? 'stable' : 'unstable'}">${c.pulse.toFixed(0)} bpm ${c.stable ? '●' : '○'}</span>`
-    : 'waiting for signal…';
+    : sig.status;
 
   requestAnimationFrame(frame);
 }
@@ -157,6 +188,8 @@ async function boot() {
   const cfg = await window.manndaan?.getConfig?.() ?? { mode: 'mock' };
   const mock = cfg.mode === 'mock';
   console.log(`MannDaan booted in ${cfg.mode} mode`);
+  console.log(`[measure] canvas ${canvas.width}x${canvas.height} backing store, `
+    + `window ${innerWidth}x${innerHeight}, devicePixelRatio ${devicePixelRatio}`);
 
   scene = new Scene(canvas);
 
@@ -167,6 +200,7 @@ async function boot() {
       signal = new MockSignal();
     } else {
       if (!cfg.apiKey) throw new Error('no PRESAGE_API_KEY in .env');
+      await window.manndaan?.grantCamera?.();   // unlocks the camera in main
       signal = new LiveSignal({ apiKey: cfg.apiKey });
       signal.addEventListener('stream', (e) => {
         // small live preview: honest proof the signal is real
@@ -177,7 +211,12 @@ async function boot() {
       });
     }
     signal.addEventListener('sample', onSample);
-    signal.addEventListener('hint', (e) => ritual.showHint(e.detail.message));
+    signal.addEventListener('hint', (e) => {
+      ritual.showHint(e.detail.message);
+      if (!sig.breathing) sig.status = e.detail.message;   // explain the wait
+      // 5 = kTooDark: hold the screen-lamp up for a while
+      if (e.detail.code === 5) sig.lampUntil = performance.now() + 10000;
+    });
     await signal.start();   // mock: sync; live: resolves when the camera runs
   };
 

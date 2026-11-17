@@ -39,12 +39,26 @@ function createWindow() {
     }
   });
 
-  if (!MOCK) {
-    const { bindSmartSpectraIpc } = require('@smartspectra/node-sdk/main');
-    bindSmartSpectraIpc(win);
-  }
 
-  win.once('ready-to-show', () => win.show());
+
+  win.once('ready-to-show', () => {
+    win.show();
+    // The SDK's native runtime is hundreds of MB and loads synchronously, so
+    // binding it before the first paint delayed the window by seconds. The
+    // renderer cannot start a session until the user consents, which is far
+    // later, so the bind happens once the opening screen is already up.
+    if (!MOCK) {
+      const t0 = Date.now();
+      const { bindSmartSpectraIpc } = require('@smartspectra/node-sdk/main');
+      bindSmartSpectraIpc(win);
+      console.log(`[measure] SmartSpectra runtime loaded in ${Date.now() - t0} ms`);
+    }
+  });
+  // --devtools opens the console before the camera starts, so the first
+  // [measure] lines are captured rather than scrolled past
+  if (process.argv.includes('--devtools')) {
+    win.webContents.openDevTools({ mode: 'detach' });
+  }
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'), {
     query: {
@@ -56,11 +70,19 @@ function createWindow() {
   return win;
 }
 
+const launchedAt = Date.now();
+
 app.whenReady().then(() => {
   // Camera only, and only for our own bundled file:// page. Everything else: denied.
+  // The renderer cannot get the camera until the consent screen tells the main
+  // process the user agreed. Until then every media request is denied, so the
+  // guarantee holds even if the UI were bypassed.
+  let cameraConsented = false;
+  ipcMain.handle('manndaan:consent', () => { cameraConsented = true; return true; });
+  ipcMain.handle('manndaan:releaseCamera', () => { cameraConsented = false; return true; });
+
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
-    const allowed = permission === 'media' && wc.getURL().startsWith('file://');
-    callback(allowed);
+    callback(permission === 'media' && cameraConsented && wc.getURL().startsWith('file://'));
   });
 
   // Our config preload runs alongside the SDK preload (which occupies the
@@ -91,18 +113,20 @@ app.whenReady().then(() => {
   }
 
   const win = createWindow();
+  win.once('show', () => console.log(`[measure] window visible ${Date.now() - launchedAt} ms after launch`));
 
-  if (SMOKE) {
-    win.webContents.on('console-message', (e) => {
-      if (e.level === 'error') {
-        console.error('[renderer error]', e.message);
-        process.exitCode = 1;
-      } else {
-        console.log('[renderer]', e.message);
-      }
-    });
-    setTimeout(() => app.quit(), 58000);
-  }
+  // Renderer console goes to the terminal too: a failed live session is then
+  // diagnosable from the log alone, without copying out of DevTools.
+  win.webContents.on('console-message', (e) => {
+    if (e.level === 'error') {
+      console.error('[renderer error]', e.message);
+      if (SMOKE) process.exitCode = 1;
+    } else {
+      console.log('[renderer]', e.message);
+    }
+  });
+
+  if (SMOKE) setTimeout(() => app.quit(), 58000);
 });
 
 app.on('window-all-closed', () => app.quit());

@@ -8,7 +8,10 @@
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --mock",
     "smoke": "npm run build && electron . --mock --smoke",
-    "dev:debug": "npm run build && electron . --mock --dev"
+    "dev:debug": "npm run build && electron . --mock --dev",
+    "start:nosandbox": "npm run build && electron . --no-sandbox",
+    "dev:nosandbox": "npm run build && electron . --mock --no-sandbox",
+    "camera:reset": "electron tools/reset-camera.js"
   },
   "author": "vimla01",
   "license": "MIT",

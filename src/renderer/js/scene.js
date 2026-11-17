@@ -284,6 +284,27 @@ export class Scene {
   _waterFx(ctx, now, t, s, w, h) {
     this.ripples = this.ripples.filter((r) => now - r.t0 < r.dur);
     if (s.diya.alpha < 0.02) return;
+    // Lite mode: rings straight onto the canvas, no offscreen layer and no
+    // blur pass — the breath feedback survives, the CPU cost does not.
+    if (s.lite) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (let i = 0; i < this.ripples.length; i++) {
+        const r = this.ripples[i];
+        const age = (now - r.t0) / r.dur;
+        const rx = (r.rx0 + (r.rx1 - r.rx0) * (1 - Math.pow(1 - age, 3))) * r.k;
+        const base = 0.16 * (1 - age) * (i === this.ripples.length - 1 ? 1 : 0.15);
+        if (base < 0.005) continue;
+        ctx.strokeStyle = `rgba(255,180,90,${base})`;
+        ctx.lineWidth = 7 * (this.vs / 1.5);
+        ctx.beginPath();
+        ctx.ellipse(r.x, r.y, rx, rx * 0.22, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
     const k = this.vs / 1.5;
     const sc = s.diya.scale * this.vs * 1.35;
     const rk = s.diya.scale * k;
@@ -364,7 +385,7 @@ export class Scene {
   /** Wave crests inside the diya's glow, redrawn warm so the water still
    *  reads as water where the lamplight falls on it. */
   _waveGlints(ctx, t, s, w, h) {
-    if (s.diya.alpha < 0.2) return;
+    if (s.diya.alpha < 0.2 || s.lite) return;
     const v = this.vs, waterY = this.waterY;
     const dpx = s.diya.x * w, dpy = s.diya.y * h;
     const energy = s.flameEnergy ?? 0.5;
@@ -733,6 +754,21 @@ export class Scene {
     }
 
     // ---- seven breath diyas ----
+    // The diya lights the room. Not decoration: this is the screen used as a
+    // lamp so the webcam has something to work with in a dark room. It appears
+    // only while the SDK reports kTooDark, and fades once it can see.
+    if (s.lamp > 0.01) {
+      const lg = ctx.createRadialGradient(w / 2, h * 0.1, 10, w / 2, h * 0.1, h * 0.95);
+      lg.addColorStop(0, `rgba(255,206,150,${0.40 * s.lamp})`);
+      lg.addColorStop(0.35, `rgba(255,186,120,${0.20 * s.lamp})`);
+      lg.addColorStop(1, `rgba(255,170,100,${0.04 * s.lamp})`);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = lg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+
     if (s.breath && s.breath.visible) this._drawBreathDots(ctx, now, s, w, h);
   }
 

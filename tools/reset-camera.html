@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<body>
+<script>
+(async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const track = stream.getVideoTracks()[0];
+    console.log('camera: ' + track.label);
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const before = track.getSettings();
+    console.log('before: ' + JSON.stringify({
+      exposureMode: before.exposureMode, whiteBalanceMode: before.whiteBalanceMode,
+      focusMode: before.focusMode, brightness: before.brightness,
+    }));
+    const advanced = [];
+    if (caps.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' });
+    if (caps.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' });
+    if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
+    if (advanced.length) {
+      await track.applyConstraints({ advanced });
+      console.log('restored: ' + JSON.stringify(advanced));
+    } else {
+      console.log('this camera exposes no exposure/white-balance controls to the browser; '
+        + 'if it is still dark, reload the uvcvideo module or reboot');
+    }
+    console.log('after: ' + JSON.stringify(track.getSettings()));
+    track.stop();
+    console.log('[done] camera released');
+  } catch (e) {
+    console.log('[done] failed: ' + e.message);
+  }
+})();
+</script>
