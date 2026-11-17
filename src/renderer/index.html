@@ -207,7 +207,18 @@
     #readout .stable { color: #9fc49a; }
     #readout .unstable { color: #b08a6a; }
 
+    /* while framing, the preview becomes the subject of the screen */
+    body.framing #preview {
+      width: min(46vw, 560px);
+      right: 50%;
+      transform: translateX(50%) scaleX(-1);
+      bottom: 14vh;
+      opacity: 1;
+      border-color: rgba(232, 179, 106, 0.5);
+      box-shadow: 0 0 60px rgba(255, 170, 90, 0.18);
+    }
     #preview {
+      transition: width 0.8s ease, right 0.8s ease, bottom 0.8s ease;
       position: fixed; right: 120px; bottom: 76px;
       width: 280px; border-radius: 6px;
       border: 1px solid rgba(138, 143, 166, 0.35);

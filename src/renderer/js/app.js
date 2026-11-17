@@ -42,6 +42,8 @@ const sig = {
   status: 'warming up — the first reading takes a few seconds',
   lamp: 0,             // screen used as a lamp when the camera cannot see
   lampUntil: 0,
+  okSince: 0,          // when the SDK last started being happy with the framing
+  starvedUntil: 0,     // the SDK is short of frames: draw as little as possible
   lite: false,         // shed expensive effects when the CPU is needed elsewhere
   samples: 0,
 };
@@ -53,10 +55,23 @@ function onSample(e) {
   sig.cardio = d.cardio;
   sig.samples++;
   if (sig.samples === 1) console.log('first sample received');
-  if (ritual?.state === 'breathe') gate.feed(d.trace, d.t);
+  if (ritual?.state === 'breathe') {
+    gate.feed(d.trace, d.t);
+    // the reading is alive but no breath has been counted for a while: either
+    // the breaths are too shallow to see, or the trace has gone flat
+    if (lastBreathAt && d.t - lastBreathAt > 25000) {
+      lastBreathAt = d.t;
+      ritual.showHint('Breathe deeper — let your chest rise and fall.');
+    }
+  }
 }
 
 // --- breath gate ------------------------------------------------------------
+const breathsOverride = Number(new URLSearchParams(location.search).get('breaths'));
+if (Number.isFinite(breathsOverride) && breathsOverride > 0) {
+  TUNING.needed = breathsOverride;
+  console.log(`[dev] breath gate shortened to ${breathsOverride} (ships at 7)`);
+}
 const gate = new BreathGate(TUNING);
 let rushHinted = false;
 
@@ -74,7 +89,10 @@ gate.addEventListener('breath', (e) => {
     ritual.showHint('Slower. The river is in no hurry.');
   }
 });
-gate.addEventListener('progress', (e) => updateDots(e.detail.count));
+gate.addEventListener('progress', (e) => {
+  updateDots(e.detail.count);
+  lastBreathAt = performance.now();
+});
 gate.addEventListener('release', () => ritual.release());
 gate.addEventListener('rush', () => {
   ritual.pushback();
@@ -83,10 +101,10 @@ gate.addEventListener('rush', () => {
 });
 
 // --- main loop --------------------------------------------------------------
-let scene, ritual;
+let scene, ritual, signal = null;   // module scope: the frame loop releases the camera
 let fpsCount = 0, fpsStart = 0;
 let prevState = '';
-let prevTraceSmooth = 0, lastExhaleRipple = 0;
+let prevTraceSmooth = 0, lastExhaleRipple = 0, lastBreathAt = 0;
 let fpsSamples = [];
 
 // The scene was rendering at 100+ fps, starving the SDK's camera pipeline.
@@ -95,7 +113,10 @@ const FRAME_MS = 1000 / 30;
 let lastDraw = 0;
 
 function frame(now) {
-  if (now - lastDraw < FRAME_MS) { requestAnimationFrame(frame); return; }
+  // Hand the camera pipeline as much CPU as it needs: while the SDK reports it
+  // is short of frames we drop to 15 fps, which it needs far more than we do.
+  const budget = now < sig.starvedUntil ? 1000 / 15 : FRAME_MS;
+  if (now - lastDraw < budget) { requestAnimationFrame(frame); return; }
   lastDraw = now;
 
   // FPS instrumentation for NOTES.md
@@ -193,7 +214,6 @@ async function boot() {
 
   scene = new Scene(canvas);
 
-  let signal = null;
   const startSignal = async () => {
     if (signal) return;
     if (mock) {
@@ -202,6 +222,10 @@ async function boot() {
       if (!cfg.apiKey) throw new Error('no PRESAGE_API_KEY in .env');
       await window.manndaan?.grantCamera?.();   // unlocks the camera in main
       signal = new LiveSignal({ apiKey: cfg.apiKey });
+      signal.addEventListener('validation', (e) => {
+        if (e.detail.code === 0) sig.okSince = sig.okSince || performance.now();
+        else sig.okSince = 0;
+      });
       signal.addEventListener('stream', (e) => {
         // small live preview: honest proof the signal is real
         const v = document.getElementById('preview');
@@ -216,12 +240,16 @@ async function boot() {
       if (!sig.breathing) sig.status = e.detail.message;   // explain the wait
       // 5 = kTooDark: hold the screen-lamp up for a while
       if (e.detail.code === 5) sig.lampUntil = performance.now() + 10000;
+      // 11 = kFrameRateTooLow: the camera is starved, so draw less for a while
+      if (e.detail.code === 11) sig.starvedUntil = performance.now() + 20000;
     });
     await signal.start();   // mock: sync; live: resolves when the camera runs
   };
 
   ritual = new Ritual({
     overlay, hintline, readout, scene, mock,
+    // the SDK has been content with the framing for a second and a half
+    isFramed: () => sig.okSince > 0 && performance.now() - sig.okSince > 1500,
     onConsent: startSignal,   // camera (or mock) starts only after consent
   });
 
@@ -274,5 +302,21 @@ async function boot() {
     at(56000, () => console.log(`smoke: final state=${ritual.state} worry="${ritual.worry}" calm=${gate.calmCount}`));
   }
 }
+
+// Restoring the camera must never depend on the ritual finishing. If the
+// window closes, the app quits, or anything throws mid-session, the webcam
+// still has to come back with automatic exposure — otherwise every other app
+// on the machine inherits a locked, dark picture.
+const releaseCamera = () => {
+  try { signal?.stop?.(); } catch (err) { console.warn('release failed', err); }
+  try { window.manndaan?.releaseCamera?.(); } catch { /* main is going away */ }
+};
+// the main process asks for this before it lets the app quit
+window.manndaan?.onRestoreCamera?.(async () => {
+  try { await signal?.stop?.(); } catch (err) { console.warn('restore failed', err); }
+  window.manndaan?.cameraRestored?.();
+});
+window.addEventListener('pagehide', releaseCamera);
+window.addEventListener('beforeunload', releaseCamera);
 
 boot();

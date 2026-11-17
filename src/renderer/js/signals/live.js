@@ -25,10 +25,19 @@ const HINTS = {
   [ValidationCode.kNoFaceFound]: "The river can't see you. Face the water.",
   [ValidationCode.kMultipleFacesFound]: 'One offering at a time.',
   [ValidationCode.kFaceNotCentered]: 'Come to the middle, where the lamp can see you.',
-  [ValidationCode.kTooDark]: 'Move into the light.',
+  [ValidationCode.kTooDark]: 'Too dark for the lamp. Turn on a light, or face a window.',
   [ValidationCode.kTooBright]: 'Too much light. Soften it.',
-  [ValidationCode.kChestNotVisible]: 'Sit back — let the lamp see you breathe.',
+  [ValidationCode.kChestNotVisible]: 'Sit back — the river reads your breath from your chest.',
   [ValidationCode.kExcessiveMotion]: 'Be still, like the water.',
+  [ValidationCode.kFaceTooClose]: 'A little further back.',
+  [ValidationCode.kFaceTooFar]: 'A little closer.',
+  [ValidationCode.kFaceTooHigh]: 'Tilt the screen down, or sit a little lower.',
+  [ValidationCode.kFaceTooLow]: 'Tilt the screen up, or sit a little taller.',
+  [ValidationCode.kFaceNotForward]: 'Look towards the lamp.',
+  // "at least 25 frames per second" means nothing to someone breathing at a
+  // diya. In practice a slow camera means a dim room: the webcam lengthens
+  // its exposure and delivers fewer frames.
+  [ValidationCode.kFrameRateTooLow]: 'More light would help — the lamp is seeing you in slow motion.',
   [ValidationCode.kCameraTuning]: null,
 };
 
@@ -122,8 +131,11 @@ export class LiveSignal extends EventTarget {
     console.log(`[measure] sdk.start() resolved after ${(performance.now() - this._t0).toFixed(0)} ms`);
   }
 
-  /** Stop measuring and hand the camera back to the system straight away. */
+  /** Stop measuring and hand the camera back to the system straight away.
+   *  Safe to call repeatedly and from a page-unload handler. */
   async stop() {
+    if (this._stopping) return;
+    this._stopping = true;
     try { await this.sdk.stop(); } catch (e) { console.warn('stop failed', e); }
     if (this._stream) {
       // Put the camera back the way we found it. The SDK locks AE/AWB/focus
@@ -137,7 +149,7 @@ export class LiveSignal extends EventTarget {
           if (caps.exposureMode?.includes('continuous')) advanced.push({ exposureMode: 'continuous' });
           if (caps.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' });
           if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
-          if (advanced.length) await track.applyConstraints({ advanced });
+          if (advanced.length) track.applyConstraints({ advanced });   // not awaited: unload will not wait
           console.log('[live] camera auto-exposure restored');
         } catch (err) {
           console.warn('[live] could not restore camera controls:', err.message);
@@ -265,9 +277,10 @@ export class LiveSignal extends EventTarget {
       this._lastLogged[code] = now;
       console.log(`[validation] ${CODE_NAME[code] ?? code}${sdkHint ? ' — ' + sdkHint : ''}`);
     }
+    this.dispatchEvent(new CustomEvent('validation', { detail: { code } }));
     if (code === ValidationCode.kOk) return;
     if (now - this._lastHintAt < 6000) return;   // don't nag
-    const message = code in HINTS ? HINTS[code] : sdkHint;
+    const message = code in HINTS ? HINTS[code] : null;   // never show raw SDK text
     if (!message) return;
     this._lastHintAt = now;
     this.stats.validation[code] = (this.stats.validation[code] ?? 0) + 1;

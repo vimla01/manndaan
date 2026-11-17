@@ -11,13 +11,14 @@
 const GHAT = { x: 0.40, y: 0.80 };          // where the diya rests by the steps
 
 export class Ritual {
-  constructor({ overlay, hintline, readout, scene, mock, onConsent }) {
+  constructor({ overlay, hintline, readout, scene, mock, onConsent, isFramed }) {
     this.overlay = overlay;
     this.hintline = hintline;
     this.readout = readout;
     this.scene = scene;
     this.mock = mock;
     this.onConsent = onConsent;   // async: starts the signal source (camera in live mode)
+    this.isFramed = isFramed ?? (() => true);
 
     this.state = 'opening';
     this.worry = '';              // memory only; never persisted anywhere
@@ -152,9 +153,40 @@ export class Ritual {
       if (e.key === 'Enter' && input.value.trim()) {
         this.worry = input.value.trim();
         input.value = '';
-        this._enterSettle();
+        if (this.mock) this._enterSettle();
+        else this._enterFraming();
       }
     };
+  }
+
+  // Breathing is read from chest movement, and at laptop distance the chest is
+  // not in frame — the SDK rejects every frame until it is. Rather than let
+  // people sit through that as unexplained dead air, ask for the framing once,
+  // with the camera visible, and move on as soon as the SDK is content.
+  _enterFraming() {
+    this.state = 'framing';
+    this._show(`
+      <p class="line show" style="margin-bottom:0.6em">Sit back, so the lamp can see you breathe.</p>
+      <p class="line show" style="color: var(--dim); font-size: 0.8em">
+        Your head <em>and</em> chest should be in the picture.</p>
+      <div class="btnrow line" id="f2"><button id="skip-framing" class="quiet">Continue anyway</button></div>
+    `);
+    document.body.classList.add('framing');
+    setTimeout(() => document.getElementById('f2')?.classList.add('show'), 9000);
+    document.getElementById('skip-framing').onclick = () => this._leaveFraming();
+
+    const t0 = performance.now();
+    this._framingTimer = setInterval(() => {
+      // move on once the SDK is happy, or after 25 s so nobody is ever stuck
+      if (this.isFramed() || performance.now() - t0 > 25000) this._leaveFraming();
+    }, 250);
+  }
+
+  _leaveFraming() {
+    if (this.state !== 'framing') return;
+    clearInterval(this._framingTimer);
+    document.body.classList.remove('framing');
+    this._enterSettle();
   }
 
   _enterSettle() {

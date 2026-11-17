@@ -12,6 +12,8 @@ try {
     getCpu: () => ipcRenderer.invoke('manndaan:cpu'),
     grantCamera: () => ipcRenderer.invoke('manndaan:consent'),
     releaseCamera: () => ipcRenderer.invoke('manndaan:releaseCamera'),
+    onRestoreCamera: (fn) => ipcRenderer.on('manndaan:restore-camera', () => fn()),
+    cameraRestored: () => ipcRenderer.send('manndaan:camera-restored'),
   });
 } catch {
   // not our page — nothing to expose

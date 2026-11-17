@@ -65,6 +65,8 @@ function createWindow() {
       mode: MOCK ? 'mock' : 'live',
       smoke: SMOKE ? '1' : '0',
       dev: process.argv.includes('--dev') ? '1' : '0',
+      // --breaths N shortens the gate while testing; the ritual ships at 7
+      breaths: (process.argv.find((a) => a.startsWith('--breaths=')) || '').split('=')[1] || '',
     },
   });
   return win;
@@ -113,6 +115,7 @@ app.whenReady().then(() => {
   }
 
   const win = createWindow();
+  mainWindow = win;
   win.once('show', () => console.log(`[measure] window visible ${Date.now() - launchedAt} ms after launch`));
 
   // Renderer console goes to the terminal too: a failed live session is then
@@ -128,5 +131,38 @@ app.whenReady().then(() => {
 
   if (SMOKE) setTimeout(() => app.quit(), 58000);
 });
+
+// The SDK locks the webcam's exposure while it measures. If this process goes
+// away without restoring it, every other app on the machine inherits a dark,
+// fixed-exposure camera — so quitting is held open until the renderer has put
+// it back (or 1.5 s passes, whichever comes first).
+let cameraRestored = false;
+let mainWindow = null;
+
+function restoreCameraThenQuit(event) {
+  if (cameraRestored) return;
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) {
+    cameraRestored = true;
+    return;
+  }
+  event?.preventDefault();
+  console.log('[camera] restoring auto-exposure before quitting…');
+  mainWindow.webContents.send('manndaan:restore-camera');
+  const finish = () => {
+    if (cameraRestored) return;
+    cameraRestored = true;
+    app.quit();
+  };
+  ipcMain.once('manndaan:camera-restored', () => {
+    console.log('[camera] auto-exposure restored');
+    finish();
+  });
+  setTimeout(finish, 1500);            // never hang on shutdown
+}
+
+app.on('before-quit', restoreCameraThenQuit);
+// pkill / Ctrl-C send these; without handlers the renderer never gets a chance
+process.on('SIGTERM', () => app.quit());
+process.on('SIGINT', () => app.quit());
 
 app.on('window-all-closed', () => app.quit());
