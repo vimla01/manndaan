@@ -76,6 +76,16 @@ app.whenReady().then(() => {
     apiKey: MOCK ? null : process.env.PRESAGE_API_KEY ?? null,
   }));
 
+  // CPU of this app's processes, for the NOTES.md measurements. Electron
+  // reports usage since the previous call, so prime it and sample a window.
+  ipcMain.handle('manndaan:cpu', async () => {
+    app.getAppMetrics();
+    await new Promise((r) => setTimeout(r, 800));
+    return app.getAppMetrics()
+      .map((m) => ({ type: m.type, percentCPU: m.cpu ? +m.cpu.percentCPUUsage.toFixed(1) : null }))
+      .filter((m) => m.percentCPU !== null);
+  });
+
   if (!MOCK && !process.env.PRESAGE_API_KEY) {
     console.error('No PRESAGE_API_KEY in .env — live mode will not start. (cp .env.example .env)');
   }

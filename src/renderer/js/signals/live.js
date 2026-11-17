@@ -54,6 +54,17 @@ export class LiveSignal extends EventTarget {
     this._firstStablePulse = 0;
     this._lastHintAt = 0;
 
+    // everything the NOTES.md table needs, gathered in one session
+    this.stats = {
+      startedAt: 0, firstMetricsMs: null, firstStableBreathMs: null,
+      firstStablePulseMs: null, events: 0, traceSamples: 0,
+      traceMin: Infinity, traceMax: -Infinity,
+      rateMin: Infinity, rateMax: -Infinity,
+      pulseMin: Infinity, pulseMax: -Infinity,
+      validation: {},          // code -> count
+      errors: [],
+    };
+
     this.sdk.on('metrics', (buf, tsUs) => this._onMetrics(buf, tsUs));
     this.sdk.on('validationStatus', (code, tsUs, hint) => this._onValidation(code, hint));
     this.sdk.on('streamAvailable', (stream) => {
@@ -61,6 +72,7 @@ export class LiveSignal extends EventTarget {
     });
     this.sdk.on('error', (code, message, retryable) => {
       console.error(`[sdk error] code=${code} retryable=${retryable}: ${message}`);
+      this.stats.errors.push(`${code}: ${message}`);
       this.dispatchEvent(new CustomEvent('hint', {
         detail: { code: 'SDK_ERROR', message: 'The river lost sight of you. (see console)' },
       }));
@@ -69,6 +81,7 @@ export class LiveSignal extends EventTarget {
 
   async start() {
     this._t0 = performance.now();
+    this.stats.startedAt = Date.now();
     this._cadenceWindowStart = this._t0;
     await this.sdk.start();   // acquires the camera, emits streamAvailable
     console.log(`[measure] sdk.start() resolved after ${(performance.now() - this._t0).toFixed(0)} ms`);
@@ -83,8 +96,10 @@ export class LiveSignal extends EventTarget {
   _onMetrics(buf, tsUs) {
     const now = performance.now();
     this._eventCount++;
+    this.stats.events++;
     if (!this._firstMetricsAt) {
       this._firstMetricsAt = now;
+      this.stats.firstMetricsMs = Math.round(now - this._t0);
       console.log(`[measure] first metrics event ${(now - this._t0).toFixed(0)} ms after start`);
     }
     if (now - this._cadenceWindowStart >= 10000) {
@@ -104,8 +119,13 @@ export class LiveSignal extends EventTarget {
         confidence: rate.confidence ?? 0,
         stable: Boolean(rate.stable),
       };
+      if (Number.isFinite(rate.value)) {
+        this.stats.rateMin = Math.min(this.stats.rateMin, rate.value);
+        this.stats.rateMax = Math.max(this.stats.rateMax, rate.value);
+      }
       if (rate.stable && !this._firstStableBreath) {
         this._firstStableBreath = now;
+        this.stats.firstStableBreathMs = Math.round(now - this._t0);
         console.log(`[measure] first STABLE breathing rate ${(now - this._t0).toFixed(0)} ms after start`);
       }
     }
@@ -118,8 +138,13 @@ export class LiveSignal extends EventTarget {
         confidence: pulse.confidence ?? 0,
         stable: Boolean(pulse.stable),
       };
+      if (Number.isFinite(pulse.value)) {
+        this.stats.pulseMin = Math.min(this.stats.pulseMin, pulse.value);
+        this.stats.pulseMax = Math.max(this.stats.pulseMax, pulse.value);
+      }
       if (pulse.stable && !this._firstStablePulse) {
         this._firstStablePulse = now;
+        this.stats.firstStablePulseMs = Math.round(now - this._t0);
         console.log(`[measure] first STABLE pulse ${(now - this._t0).toFixed(0)} ms after start`);
       }
     }
@@ -128,6 +153,9 @@ export class LiveSignal extends EventTarget {
     const tr = m.breathing?.upperTrace?.at(-1);
     let trace = null;
     if (tr && Number.isFinite(tr.value)) {
+      this.stats.traceSamples++;
+      this.stats.traceMin = Math.min(this.stats.traceMin, tr.value);
+      this.stats.traceMax = Math.max(this.stats.traceMax, tr.value);
       if (this._mean === null) this._mean = tr.value;
       this._mean += (tr.value - this._mean) * 0.04;
       const dev = Math.abs(tr.value - this._mean);
@@ -147,6 +175,28 @@ export class LiveSignal extends EventTarget {
     }
   }
 
+  /** Everything measured this session, for NOTES.md. */
+  report() {
+    const s = this.stats;
+    const secs = (performance.now() - this._t0) / 1000;
+    return {
+      sessionSeconds: +secs.toFixed(1),
+      firstMetricsMs: s.firstMetricsMs,
+      metricsPerSecond: +(s.events / secs).toFixed(2),
+      firstStableBreathMs: s.firstStableBreathMs,
+      firstStablePulseMs: s.firstStablePulseMs,
+      breathingRateRange: s.rateMin === Infinity ? null
+        : [+s.rateMin.toFixed(1), +s.rateMax.toFixed(1)],
+      pulseRange: s.pulseMin === Infinity ? null
+        : [Math.round(s.pulseMin), Math.round(s.pulseMax)],
+      traceSamples: s.traceSamples,
+      traceRawRange: s.traceMin === Infinity ? null
+        : [+s.traceMin.toFixed(4), +s.traceMax.toFixed(4)],
+      validationCounts: s.validation,
+      sdkErrors: s.errors,
+    };
+  }
+
   _onValidation(code, sdkHint) {
     if (code === ValidationCode.kOk) return;
     const now = performance.now();
@@ -154,6 +204,7 @@ export class LiveSignal extends EventTarget {
     const message = code in HINTS ? HINTS[code] : sdkHint;
     if (!message) return;
     this._lastHintAt = now;
+    this.stats.validation[code] = (this.stats.validation[code] ?? 0) + 1;
     this.dispatchEvent(new CustomEvent('hint', { detail: { code, message } }));
   }
 }

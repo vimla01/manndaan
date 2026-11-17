@@ -4,4 +4,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('manndaan', {
   getConfig: () => ipcRenderer.invoke('manndaan:getConfig'),
+  getCpu: () => ipcRenderer.invoke('manndaan:cpu'),
 });

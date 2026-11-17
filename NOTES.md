@@ -19,6 +19,21 @@ Note: we measure cadence/lag ourselves; other entrants' numbers are not used.
 Optional during a webcam session: capture outbound traffic to Presage hosts and log the volume here, to back up the on-device claim with our own numbers, e.g.
 `sudo tcpdump -i any -w /tmp/manndaan.pcap host cont-api.physiology.presagetech.com` (or `nethogs` for a per-process live view) while running one full ritual.
 
+## Live session procedure (one run, to spend trial credits once)
+
+1. `cp .env.example .env` and paste the key from physiology.presagetech.com.
+2. Sit facing a lamp — the SDK needs light on your face and chest, not behind you.
+3. `npm start` (in an Electron-based IDE terminal, prefix `env -u ELECTRON_RUN_AS_NODE`).
+4. Open DevTools (Ctrl+Shift+I) **before** clicking "Light the diya" — the first
+   measurements are logged in the seconds right after the camera starts.
+5. Consent, type a worry, press Enter.
+6. Breathe normally for ~30 s and let the readout fill in (breath/min, pulse, stable dots).
+7. Breathe deliberately fast for ~20 s — the river should push the diya back.
+8. Then breathe slowly (cycles of 5 s or longer) until the diya is released.
+9. The session report prints automatically on release; `mdReport()` prints it again any time.
+10. Copy the whole `=== MannDaan session report ===` JSON block, plus any `[gate]`
+    and `[sdk error]` lines, into the table below.
+
 ## Debugging log
 
 - **2026-11-16 — `app` undefined on launch.** `require('electron')` returned no API when launched from inside an Electron-based IDE terminal: the IDE exports `ELECTRON_RUN_AS_NODE=1`, which makes our Electron run as plain Node. Fix: `env -u ELECTRON_RUN_AS_NODE npx electron .` (only needed in such terminals; a normal shell is fine).

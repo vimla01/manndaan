@@ -83,13 +83,16 @@ let scene, ritual;
 let fpsCount = 0, fpsStart = 0;
 let prevState = '';
 let prevTraceSmooth = 0, lastExhaleRipple = 0;
+let fpsSamples = [];
 
 function frame(now) {
   // FPS instrumentation for NOTES.md
   if (!fpsStart) fpsStart = now;
   fpsCount++;
   if (now - fpsStart >= 10000) {
-    console.log(`[measure] render fps: ${(fpsCount / ((now - fpsStart) / 1000)).toFixed(1)} over last 10 s`);
+    const fps = +(fpsCount / ((now - fpsStart) / 1000)).toFixed(1);
+    fpsSamples.push(fps);
+    console.log(`[measure] render fps: ${fps} over last 10 s`);
     fpsCount = 0;
     fpsStart = now;
   }
@@ -118,6 +121,7 @@ function frame(now) {
 
   // breath-gate visibility + lifecycle follows the ritual state
   if (ritual.state !== prevState) {
+    if (ritual.state === 'release') window.mdReport?.();   // auto-print at the end
     if (ritual.state === 'breathe' && prevState === 'settle') {
       gate.reset();           // a fresh offering starts from zero breaths
       updateDots(0);
@@ -181,6 +185,24 @@ async function boot() {
     overlay, hintline, readout, scene, mock,
     onConsent: startSignal,   // camera (or mock) starts only after consent
   });
+
+  // One command in DevTools prints everything NOTES.md needs: `mdReport()`
+  window.mdReport = async () => {
+    const sorted = [...fpsSamples].sort((a, b) => a - b);
+    const report = {
+      mode: cfg.mode,
+      fps: {
+        samples: fpsSamples,
+        median: sorted.length ? sorted[Math.floor(sorted.length / 2)] : null,
+        min: sorted[0] ?? null,
+      },
+      cpuPercent: await (window.manndaan?.getCpu?.() ?? Promise.resolve(null)).catch(() => null),
+      gate: { calmBreaths: gate.calmCount, needed: gate.needed, tuning: TUNING },
+      signal: signal && signal.report ? signal.report() : null,
+    };
+    console.log('=== MannDaan session report ===\n' + JSON.stringify(report, null, 2));
+    return report;
+  };
 
   if (mock) {
     document.getElementById('mocktag').hidden = false;
