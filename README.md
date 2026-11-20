@@ -33,6 +33,13 @@ is kept.
 </tr>
 </table>
 
+## Demo
+
+**[Watch MannDaan in two minutes](https://youtu.be/GWVaqbMG6ws)**: consent,
+writing a worry, the framing step, breathing too fast and being pushed back,
+then seven calm breaths and the release. The live breath and pulse readout is on
+screen throughout.
+
 ## Run it
 
 ```bash
