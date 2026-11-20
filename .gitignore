@@ -4,3 +4,9 @@ src/renderer/build/
 dist/
 out/
 *.log
+brag-output/
+m.md
+docs/cover.png
+src/renderer/cover.html
+src/renderer/js/cover.js
+tools/cover.js
